@@ -20,7 +20,7 @@ import net.java.games.input.Controller.Type;
  * 
  * @author Andrew Hayden
  */
-final class ControllerUtils
+public final class ControllerUtils
 {
     /**
      * Unlikely soft limit on how many controllers we can cache data for.
@@ -66,11 +66,60 @@ final class ControllerUtils
         = Collections.synchronizedMap(new HashMap<Controller, Integer>());
 
     /**
+     * Cache of computed type codes for components we have seen this run.
+     */
+    private final static Map<Component, Integer> cachedTypeCodesByComponent
+        = Collections.synchronizedMap(new HashMap<Component, Integer>());
+
+    /**
      * Private constructor discourages unwanted instantiation.
      */
     private ControllerUtils()
     {
         // Private constructor discourages unwanted instantiation.
+    }
+
+    /**
+     * Generates a type code for the type of component specified.
+     * <p>
+     * The type code should be the same every time the same component is
+     * present, even between runs, provided that there are no changes to
+     * drivers or jinput libraries.  It should also be the same regardless
+     * of which individual <em>phsyical controller</em> is plugged in so
+     * long as it is identical to others of its type.  For example, if you
+     * plug in one XBOX360 controller, its buttons should have the same
+     * generic type codes as the buttons of every other XBOX360 controller
+     * of the same hardware revision.
+     * <p>
+     * Note that this is <em>not</em> a hashcode.  It does <em>not</em>
+     * uniquely identify an individual piece of hardware.
+     * <p>
+     * This method lazily caches type codes so that subsequent lookups are
+     * (very) cheap for the same physical device in any given run.
+     * 
+     * @param component the component to generate a type code for
+     * @return the type code for this type of component
+     */
+    final static int generateTypeCode(Component component)
+    {
+        Integer cached = cachedTypeCodesByComponent.get(component);
+        if (cached == null)
+        {
+            int typeCode = 39;
+            String name = component.getName();
+            boolean isAnalog = component.isAnalog();
+            boolean isRelative = component.isRelative();
+            typeCode += 39 * (name == null? 0 : name.hashCode());
+            typeCode += 39 * (isAnalog ? 11 : 17);
+            typeCode += 39 * (isRelative ? 13 : 19);
+
+            if (cachedTypeCodesByComponent.size() < MAX_CACHE_SIZE)
+            {
+                cachedTypeCodesByComponent.put(component, typeCode);
+            }
+            return typeCode;
+        }
+        return cached;
     }
 
     /**
@@ -100,33 +149,36 @@ final class ControllerUtils
         Integer cached = cachedTypeCodesByController.get(controller);
         if (cached == null)
         {
-            int hashCode = 37;
+            int typeCode = 37;
             String controllerName = controller.getName();
-            hashCode += 37 * (controllerName == null?
+            typeCode += 37 * (controllerName == null?
                     0 : controllerName.hashCode());
 
             for (Component component : controller.getComponents())
             {
-                String name = component.getName();
-                boolean isAnalog = component.isAnalog();
-                boolean isRelative = component.isRelative();
-                hashCode += 37 * (name == null? 0 : name.hashCode());
-                hashCode += 37 * (isAnalog ? 11 : 17);
-                hashCode += 37 * (isRelative ? 13 : 19);
+                typeCode += 37 * generateTypeCode(component);
             }
 
             for (Rumbler rumbler : controller.getRumblers())
             {
                 String associatedAxisName = rumbler.getAxisName();
-                hashCode += 1 + (37 * (associatedAxisName == null ?
+                typeCode += 1 + (37 * (associatedAxisName == null ?
                         0 : associatedAxisName.hashCode()));
+            }
+
+            // Descend into subcontrollers.
+            Controller[] subControllers = controller.getControllers();
+            typeCode += 37 * subControllers.length;
+            for (Controller subController : subControllers)
+            {
+                typeCode += 37 * generateTypeCode(subController);
             }
 
             if (cachedTypeCodesByController.size() < MAX_CACHE_SIZE)
             {
-                cachedTypeCodesByController.put(controller, hashCode);
+                cachedTypeCodesByController.put(controller, typeCode);
             }
-            return hashCode;
+            return typeCode;
         }
         else
         {
@@ -147,7 +199,7 @@ final class ControllerUtils
      * @return the first gamepad (or gamepad-like device, if requested) found,
      * if any; otherwise, <code>null</code>
      */
-    final static Controller getDefaultGamepad(
+    public final static Controller getDefaultGamepad(
             boolean strictGamepadMatching)
     {
         List<Controller> allGamepads = getAllGamepads(strictGamepadMatching);
@@ -156,6 +208,73 @@ final class ControllerUtils
             return allGamepads.get(0);
         }
         return null;
+    }
+
+    /**
+     * Returns a list of all controllers regardless of their type.
+     * 
+     * @return such a list, possibly of length 0 but never <code>null</code>
+     */
+    public final static List<Controller> getAllControllers()
+    {
+        return Arrays.asList(
+                ControllerEnvironment.getDefaultEnvironment().getControllers());
+    }
+
+    /**
+     * Returns all of the components of the specified controller (and,
+     * optionally, any subcontrollers contained therein).
+     * <p>
+     * It is often unimportant under which subcontroller a component resides,
+     * so long as the component can be found and configured.  To that end,
+     * this method provides a way to "flatten" the controller space and simply
+     * get a list of every component in the entire controller, regardless of
+     * any nested subcontrollers that may be present in the device
+     * (for example, an integrated mouse in a keyboard).
+     * 
+     * @param controller the controller to find the components of
+     * @param recursive whether or not to recursively descend into any and all
+     * subcontrollers
+     * @return a list of all the components in the controller
+     */
+    public final static List<Component> getComponents(
+            Controller controller, boolean recursive)
+    {
+        List<Component> results = new ArrayList<Component>();
+        if (recursive)
+        {
+            getComponentsHelper(controller, results);
+        }
+        else
+        {
+            for (Component component : controller.getComponents())
+            {
+                results.add(component);
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Recursively retrieves all components for the specified controller,
+     * in a breadth-first search of the controller space.
+     * 
+     * @param controller the controller to read from
+     * @param results running list of all components found so far
+     */
+    private final static void getComponentsHelper(Controller controller,
+            List<Component> results)
+    {
+        for (Component component : controller.getComponents())
+        {
+            results.add(component);
+        }
+
+        for (Controller subController : controller.getControllers())
+        {
+            getComponentsHelper(subController, results);
+        }
     }
 
     /**
@@ -177,7 +296,7 @@ final class ControllerUtils
      * attached to the system, psosibly of length zero but never
      * <code>null</code>
      */
-    final static List<Controller> getAllGamepads(
+    public final static List<Controller> getAllGamepads(
             boolean strictGamepadMatching)
     {
         List<Controller> allGamepads = new ArrayList<Controller>();
@@ -227,7 +346,7 @@ final class ControllerUtils
      * explicitly and precisely; otherwise, <code>false</code>
      * @see #isGamepadLike(Controller)
      */
-    final static boolean isGamepad(Controller controller)
+    public final static boolean isGamepad(Controller controller)
     {
         return (controller.getType() == Type.GAMEPAD);
     }
@@ -275,7 +394,7 @@ final class ControllerUtils
      * @return <code>true</code> if it is very likely that this controller
      * is a gamepad or gamepad-like device; otherwise, <code>false</code>
      */
-    final static boolean isGamepadLike(Controller controller)
+    public final static boolean isGamepadLike(Controller controller)
     {
         // First we'll check some common types.  These can lie, though,
         // depending on the manufacturer, so we're only going to give them

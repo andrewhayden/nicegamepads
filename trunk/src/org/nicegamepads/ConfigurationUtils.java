@@ -1,6 +1,10 @@
 package org.nicegamepads;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
+
+import net.java.games.input.Component;
+import net.java.games.input.Controller;
 
 final class ConfigurationUtils
 {
@@ -28,6 +32,24 @@ final class ConfigurationUtils
             ComponentConfiguration source)
     {
         return new ImmutableComponentConfiguration(source);
+    }
+
+    /**
+     * Makes an independent, immutable copy of the specified configuration.
+     * <p>
+     * The returned object is completely independent of the original source.
+     * <p>
+     * This method is threadsafe but the source object being copied may not
+     * be.  It is up to the caller to ensure that the configuration being
+     * copied cannot be modified during the copying process.
+     * 
+     * @param source the configuration to copy
+     * @return an independent, read-only copy of the configuration
+     */
+    final static ControllerConfiguration immutableControllerConfiguration(
+            ControllerConfiguration source)
+    {
+        return new ImmutableControllerConfiguration(source);
     }
 
     /**
@@ -415,6 +437,36 @@ final class ConfigurationUtils
                     source.valueIdsByValue);
         }
 
+        /**
+         * For internal use only.
+         */
+        private ImmutableComponentConfiguration()
+        {
+            // Nothing
+        }
+
+        /* (non-Javadoc)
+         * @see org.nicegamepads.ControllerConfiguration#clone()
+         */
+        protected final ComponentConfiguration clone()
+        throws CloneNotSupportedException
+        {
+            // Do NOT call super.clone.  This is purposeful!  Super.clone()
+            // would create a MUTABLE INSTANCE of this class.
+            ImmutableComponentConfiguration clone =
+                new ImmutableComponentConfiguration();
+            clone.centerValue = centerValue;
+            clone.deadZoneLowerBound = deadZoneLowerBound;
+            clone.deadZoneUpperBound = deadZoneUpperBound;
+            clone.granularity = granularity;
+            clone.isInverted = isInverted;
+            clone.isTurboEnabled = isTurboEnabled;
+            clone.turboDelayMillis = turboDelayMillis;
+            clone.userDefinedId = userDefinedId;
+            clone.valueIdsByValue.putAll(valueIdsByValue);
+            return clone;
+        }
+
         @Override
         public final void setCenterValue(float centerValue)
         {
@@ -466,6 +518,102 @@ final class ConfigurationUtils
 
         @Override
         public final void setValueId(float value, int id)
+        {
+            throw new UnsupportedOperationException(
+                "This configuration is read-only.");
+        }
+    }
+
+    /**
+     * An immutable, and therefore threadsafe, representation of a controller
+     * configuration.
+     * 
+     * @author Andrew Hayden
+     */
+    private final static class ImmutableControllerConfiguration
+    extends ControllerConfiguration
+    {
+        /**
+         * For internal use only.
+         * 
+         * @param source the source to copy from
+         */
+        ImmutableControllerConfiguration(ControllerConfiguration source)
+        {
+            super();
+            // Copy will have blank cache of component locations by controller
+            // config.  This is exactly what should happen, since we are creating
+            // brand new config objects.
+            Controller controller = source.getController();
+
+            // Generate type code immediately.
+            setController(controller);
+            setControllerTypeCode(ControllerUtils.generateTypeCode(controller));
+
+            // Fill in config info for components
+            Component[] components = controller.getComponents();
+            int numComponents = (components == null ? 0 : components.length);
+            LinkedHashMap<Component, ComponentConfiguration>
+                newComponentConfigurations =
+                    new LinkedHashMap<Component, ComponentConfiguration>(
+                            numComponents);
+            for (int index=0; index<components.length; index++)
+            {
+                newComponentConfigurations.put(
+                        components[index],
+                        new ImmutableComponentConfiguration(
+                                source.getComponentConfigurations().get(
+                                        components[index])));
+            }
+            setComponentConfigurations(newComponentConfigurations);
+
+            // Fill in config info for nested controllers
+            Controller[] subControllers = controller.getControllers();
+            int numSubControllers = (subControllers == null ?
+                    0 : subControllers.length);
+            LinkedHashMap<Controller, ControllerConfiguration>
+                newSubControllerConfigurations =
+                    new LinkedHashMap<Controller, ControllerConfiguration>(
+                            numSubControllers);
+            for (int index=0; index<subControllers.length; index++)
+            {
+                newSubControllerConfigurations.put(
+                        subControllers[index],
+                            new ImmutableControllerConfiguration(
+                                    source.getSubControllerConfigurations()
+                                        .get(subControllers[index])));
+            }
+        }
+
+        /**
+         * For internal use only.
+         */
+        private ImmutableControllerConfiguration()
+        {
+            // Do nothing.
+        }
+
+        /* (non-Javadoc)
+         * @see org.nicegamepads.ControllerConfiguration#clone()
+         */
+        protected final ControllerConfiguration clone()
+        throws CloneNotSupportedException
+        {
+            // Do NOT call super.clone.  This is purposeful!  Super.clone()
+            // would create a MUTABLE INSTANCE of this class.
+            ImmutableControllerConfiguration clone =
+                new ImmutableControllerConfiguration();
+            clone.setController(getController());
+            clone.setControllerTypeCode(getControllerTypeCode());
+            clone.setComponentConfigurations(getComponentConfigurations());
+            clone.setSubControllerConfigurations(getSubControllerConfigurations());
+            return clone;
+        }
+
+        @Override
+        public final void setConfiguration(Component component,
+                ComponentConfiguration configuration)
+                throws ConfigurationException
         {
             throw new UnsupportedOperationException(
                 "This configuration is read-only.");

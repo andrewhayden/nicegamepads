@@ -1,11 +1,11 @@
 package org.nicegamepads;
 
 /**
- * An exception representing a configuration error.
+ * An exception representing a generic configuration error.
  *
  * @author Andrew Hayden
  */
-public class ConfigurationException extends Exception
+public class ConfigurationException extends RuntimeException
 {
     /**
      * Default constructor.

@@ -1,6 +1,7 @@
 package org.nicegamepads;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -78,12 +79,32 @@ public class ComponentConfiguration implements Cloneable
         valueIdsByValue = new HashMap<Float, Integer>();
     }
 
+    /**
+     * Constructs a copy of the specified configuration.
+     * <p>
+     * This is a safe alternative to calling {@link #clone()}, which may
+     * be overridden by subclasses.
+     */
+    ComponentConfiguration(ComponentConfiguration source)
+    {
+        userDefinedId = source.userDefinedId;
+        deadZoneLowerBound = source.deadZoneLowerBound;
+        deadZoneUpperBound = source.deadZoneUpperBound;
+        granularity = source.granularity;
+        isInverted = source.isInverted;
+        isTurboEnabled = source.isTurboEnabled;
+        centerValue = source.centerValue;
+        valueIdsByValue = new HashMap<Float, Integer>(source.valueIdsByValue);
+    }
+
     /* (non-Javadoc)
      * @see java.lang.Object#clone()
      */
     @Override
-    protected final Object clone() throws CloneNotSupportedException
+    protected ComponentConfiguration clone()
+    throws CloneNotSupportedException
     {
+        super.clone();
         ComponentConfiguration clone = new ComponentConfiguration();
         clone.userDefinedId = userDefinedId;
         clone.deadZoneLowerBound = deadZoneLowerBound;
@@ -204,6 +225,46 @@ public class ComponentConfiguration implements Cloneable
                     prefix + ".userDefinedSymbolKey." + userKeySerialized);
             valueIdsByValue.put(trueKey, trueValue);
         }
+    }
+
+    /**
+     * Returns all of the values that have IDs bound via
+     * {@link #setValueId(float, int)}, in no particular order.
+     * 
+     * @return the values as an array (possibly of length zero but never
+     * <code>null</code>)
+     */
+    public final float[] getAllValuesWithIds()
+    {
+        float[] values = new float[valueIdsByValue.size()];
+        int counter = 0;
+        for (float f : valueIdsByValue.keySet())
+        {
+            values[counter++] = f;
+        }
+        return values;
+    }
+
+    /**
+     * Returns all of the IDs that have been vound to values via
+     * {@link #setValueId(float, int)}, in no particular order.
+     * <p>
+     * Note that multiple values may be bound to the same ID.  The returned
+     * array will not contain any duplicate values.
+     * 
+     * @return the ids as an array (possibly of length zero but never
+     * <code>null</code>), excluding any duplicates
+     */
+    public final int[] getAllValueIds()
+    {
+        Set<Integer> asSet = new HashSet<Integer>(valueIdsByValue.values());
+        int[] ids = new int[asSet.size()];
+        int counter = 0;
+        for (int i : asSet)
+        {
+            ids[counter++] = i;
+        }
+        return ids;
     }
 
     /**
@@ -657,5 +718,17 @@ public class ComponentConfiguration implements Cloneable
     public void setUserDefinedId(int userDefinedId)
     {
         this.userDefinedId = userDefinedId;
+    }
+
+    /**
+     * Not for public use.
+     * <p>
+     * Returns a reference to the live map of values.
+     * 
+     * @return a reference to the live map
+     */
+    final Map<Float, Integer> getValueIdsByValue()
+    {
+        return valueIdsByValue;
     }
 }
