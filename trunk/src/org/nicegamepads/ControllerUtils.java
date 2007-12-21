@@ -13,10 +13,15 @@ import net.java.games.input.Component;
 import net.java.games.input.Controller;
 import net.java.games.input.ControllerEnvironment;
 import net.java.games.input.Rumbler;
+import net.java.games.input.Component.Identifier;
 import net.java.games.input.Controller.Type;
 
 /**
  * Provides static utilities for accessing and interacting with controllers.
+ * <p>
+ * Most of the methods in this class will cache their results because of
+ * the simple fact that controllers don't change their composition at
+ * runtime.  
  * 
  * @author Andrew Hayden
  */
@@ -26,8 +31,10 @@ public final class ControllerUtils
      * Unlikely soft limit on how many controllers we can cache data for.
      * Could be breached in multithreaded environment but we don't really care
      * since this is probably never going to happen anyhow.
+     * <p>
+     * This is just a sanity bound in case something goes berserk.
      */
-    private final static int MAX_CACHE_SIZE = 10000;
+    private static volatile int maxCacheSizeSoftLimit = 10000;
 
     /**
      * If a QWERTY keyboard is hanging around it probably has a "component" for
@@ -72,6 +79,37 @@ public final class ControllerUtils
         = Collections.synchronizedMap(new HashMap<Component, Integer>());
 
     /**
+     * Cache of subcomponents by controller (non-recursive).
+     */
+    private final static Map<Controller, List<Component>>
+        cachedComponentsByController
+            = Collections.synchronizedMap(
+                    new HashMap<Controller, List<Component>>());
+
+    /**
+     * Cache of subcomponents by controller (recursively expanded).
+     */
+    private final static Map<Controller, List<Component>>
+        cachedDeepComponentsByController
+            = Collections.synchronizedMap(
+                    new HashMap<Controller, List<Component>>());
+
+    /**
+     * Cache of whether or not controllers are gamepad-like.
+     */
+    private final static Map<Controller, Boolean>
+        cachedGamepadLikeResultsByController =
+            Collections.synchronizedMap(new HashMap<Controller, Boolean>());
+
+    /**
+     * Cache of reverse-lookups for finding the parent controller of a
+     * component.
+     */
+    private final static Map<Component, Controller>
+        cachedParentControllersByComponent =
+            Collections.synchronizedMap(new HashMap<Component, Controller>());
+
+    /**
      * Private constructor discourages unwanted instantiation.
      */
     private ControllerUtils()
@@ -113,7 +151,7 @@ public final class ControllerUtils
             typeCode += 39 * (isAnalog ? 11 : 17);
             typeCode += 39 * (isRelative ? 13 : 19);
 
-            if (cachedTypeCodesByComponent.size() < MAX_CACHE_SIZE)
+            if (cachedTypeCodesByComponent.size() < maxCacheSizeSoftLimit)
             {
                 cachedTypeCodesByComponent.put(component, typeCode);
             }
@@ -174,7 +212,7 @@ public final class ControllerUtils
                 typeCode += 37 * generateTypeCode(subController);
             }
 
-            if (cachedTypeCodesByController.size() < MAX_CACHE_SIZE)
+            if (cachedTypeCodesByController.size() < maxCacheSizeSoftLimit)
             {
                 cachedTypeCodesByController.put(controller, typeCode);
             }
@@ -222,8 +260,82 @@ public final class ControllerUtils
     }
 
     /**
-     * Returns all of the components of the specified controller (and,
-     * optionally, any subcontrollers contained therein).
+     * Returns the type of the component.
+     * <p>
+     * This type is independent of jinput and is based upon a JDK 5+
+     * enumeration, which is more efficient than the run-time type casting
+     * that would otherwise be necessary to determine what the type of the
+     * component is.  Since component types cannot change at runtime,
+     * callers are strongly encouraged to cache the return value.
+     * <p>
+     * If the type is unrecognized, throws a {@link RuntimeException}.
+     * 
+     * @param component the component to check
+     * @return the type of the component
+     */
+    public final static ComponentType getComponentType(Component component)
+    {
+        Identifier identifier = component.getIdentifier();
+        if (identifier instanceof Identifier.Axis)
+        {
+            return ComponentType.AXIS;
+        }
+        if (identifier instanceof Identifier.Button)
+        {
+            return ComponentType.BUTTON;
+        }
+        if (identifier instanceof Identifier.Key)
+        {
+            return ComponentType.KEY;
+        }
+
+        throw new RuntimeException(
+                "Unsupported jinput component type: " + identifier);
+    }
+
+    /**
+     * Returns the cached information about the parent controller of the
+     * specified component.
+     * <p>
+     * This information is only available if
+     * {@link #cacheControllerInfo(Controller, boolean)} has been called
+     * at some point in the past for a controller that contained the
+     * component.
+     * 
+     * @param component the component to look up the parent of
+     * @return the parent controller of this component, if known; otherwise,
+     * <code>null</code>
+     */
+    public final static Controller getCachedParentController(
+            Component component)
+    {
+        return cachedParentControllersByComponent.get(component);
+    }
+
+    /**
+     * Forces the system to cache the information for the specified controller,
+     * including child-to-parent relationships between components and
+     * controllers.
+     * <p>
+     * This method does the minimum amount of work necessary to perform
+     * the caching.  If all information is already cached, this method
+     * completes quickly.
+     * 
+     * @param controller the controller to cache information about
+     * @param deep whether or not to recursively descend into subcontrollers
+     * as well
+     */
+    public final static void cacheControllerInfo(
+            Controller controller, boolean deep)
+    {
+        // Just call getComponents.
+        getComponents(controller, deep);
+    }
+
+    /**
+     * Returns an unmodifiable listing of all of the components of the
+     * specified controller (and, optionally, any subcontrollers
+     * contained therein).
      * <p>
      * It is often unimportant under which subcontroller a component resides,
      * so long as the component can be found and configured.  To that end,
@@ -231,25 +343,49 @@ public final class ControllerUtils
      * get a list of every component in the entire controller, regardless of
      * any nested subcontrollers that may be present in the device
      * (for example, an integrated mouse in a keyboard).
+     * <p>
+     * Since controllers cannot gain or lose components at runtime, this method
+     * caches results.  Subsequent calls will generally be much faster.
      * 
      * @param controller the controller to find the components of
      * @param recursive whether or not to recursively descend into any and all
      * subcontrollers
-     * @return a list of all the components in the controller
+     * @return an unmodifiable list of all the components in the controller
      */
     public final static List<Component> getComponents(
             Controller controller, boolean recursive)
     {
-        List<Component> results = new ArrayList<Component>();
-        if (recursive)
+        List<Component> results = null;
+        if(!recursive)
         {
-            getComponentsHelper(controller, results);
+            results = cachedComponentsByController.get(controller);
+            if (results == null)
+            {
+                // Calculate and cache.
+                results = new ArrayList<Component>();
+                getComponentsHelper(controller, results);
+                if (cachedComponentsByController.size() < maxCacheSizeSoftLimit)
+                {
+                    cachedComponentsByController.put(
+                            controller, Collections.unmodifiableList(results));
+                }
+            }
         }
         else
         {
-            for (Component component : controller.getComponents())
+            results = cachedDeepComponentsByController.get(controller);
+            if (results == null)
             {
-                results.add(component);
+                // Calculate and cache.
+                for (Component component : controller.getComponents())
+                {
+                    results.add(component);
+                }
+                if (cachedDeepComponentsByController.size() < maxCacheSizeSoftLimit)
+                {
+                    cachedDeepComponentsByController.put(
+                            controller, Collections.unmodifiableList(results));
+                }
             }
         }
 
@@ -268,6 +404,11 @@ public final class ControllerUtils
     {
         for (Component component : controller.getComponents())
         {
+            if (cachedParentControllersByComponent.get(component) == null
+                    && cachedParentControllersByComponent.size() < maxCacheSizeSoftLimit)
+            {
+                cachedParentControllersByComponent.put(component, controller);
+            }
             results.add(component);
         }
 
@@ -389,12 +530,43 @@ public final class ControllerUtils
      * <li>Anything making it this far is probably not a keyboard nor a mouse,
      *     so return <code>true</code>.</li>
      * </ol>
+     * <p>
+     * Because the logic for determining whether or not a controller is
+     * gamepad-like is potentially complex and expensive to compute, it is
+     * cached.  Subsequent calls will generally be much faster.
      * 
      * @param controller the controller to test
      * @return <code>true</code> if it is very likely that this controller
      * is a gamepad or gamepad-like device; otherwise, <code>false</code>
      */
     public final static boolean isGamepadLike(Controller controller)
+    {
+        // First, consult cache.  If we already know the answer, return it.
+        Boolean cachedResult =
+            cachedGamepadLikeResultsByController.get(controller);
+        if (cachedResult != null)
+        {
+            return cachedResult;
+        }
+
+        // If the answer isn't cached, calculate and return.
+        boolean isGamepadLike = isGamepadLikeInternal(controller);
+        if (cachedGamepadLikeResultsByController.size() < maxCacheSizeSoftLimit)
+        {
+            cachedGamepadLikeResultsByController.put(controller, isGamepadLike);
+        }
+        return isGamepadLike;
+    }
+
+    /**
+     * Calculated whether or not the controller is gamepad-like.
+     * 
+     * @param controller the controller to test
+     * @return <code>true</code> if the controller is gamepad-like;
+     * otherwise, <code>false</code>
+     * @see #isGamepadLike(Controller)
+     */
+    private final static boolean isGamepadLikeInternal(Controller controller)
     {
         // First we'll check some common types.  These can lie, though,
         // depending on the manufacturer, so we're only going to give them

@@ -11,6 +11,72 @@ import java.util.TreeSet;
  * Logical configuration for a single component.
  * <p>
  * This class is <em>not</em> threadsafe.
+ * <p>
+ * <h2>Inversion, Granularity, Dead Zone and Center Values</h2>
+ * This class allows you to specify the four properties listed above.
+ * Obviously, these values can interact in complex ways.  In this section
+ * we describe exactly how these properties should be processed to produce
+ * unambiguous results.
+ * <p>
+ * <strong>Important:</strong> since the values involved in these calculations
+ * are floating point values, there are fundamental precision limits that must
+ * be taken into account.  In particular, be aware that any operation that
+ * changes the value returned by the component has the potential to cause
+ * a loss of precision in the floating-point representation and, as such,
+ * to interfere with the value bindings of this object (
+ * see {@link #setValueId(float, int)} for more information on binding values).
+ * Plan accordingly.
+ * <p>
+ * Also, while reading this section bear in mind that buttons return values
+ * in the range [0,1] while other components return values in the range
+ * [-1,1]; thus the meaning of "the center of the range" may be taken to
+ * mean either 0.5 (in the case of buttons) or 0.0 (in the case of everything
+ * else).
+ * <p>
+ * <ol>
+ *  <li>Poll the raw value for the component.</li>
+ *  <li>If the granularity has been set, divide the range of possible
+ *      values into bins, starting at zero and proceeding symmetrically
+ *      in both the positive and negative directions incrementing by the amount
+ *      of granularity specified.  Clamp the polled value to the nearest
+ *      bin boundary in the direction of zero (for example,
+ *      analog stick values bin towards the center and buttons bin towards
+ *      their natural "not pressed" value).  Note that this means that the
+ *      granularity values are absolute, and are not affected by any
+ *      centering work.</li>
+ *  <li>Check the value against the dead zone.  If the polled value is in the
+ *      dead zone (boundaries inclusive), set the polled value to zero.
+ *      Note that this means that the dead zone boundaries are absolute,
+ *      and are not affected by any centering work.</li>
+ *  <li>If inverstion is on, flip the polled value around the center of the
+ *      range.  For buttons this means that 0 becomes 1 and 1 becomes 0; for all
+ *      other types of controls, this means that -1 becomes 1 and 1 becomes
+ *      -1 (0 stays as 0).  Note that this means that inversion is absolute,
+ *      and is not affected by any centering work.</li>
+ *  <li>If the center value override has been set (that is, is not the value
+ *      {@link Float#NaN}, calculate the percentage of difference
+ *      between the new override value and the natural center of the range.
+ *      Multiply the polled value to map into the new range in the same
+ *      proportions as the range center has moved; that is, the side of the
+ *      range that has shrunk compresses all values by the shrink percentage,
+ *      while the side of the range that has expanded expands all values
+ *      by the expand percentage.  For example, if the range of an analog
+ *      stick is modified such that the center is moved from 0.0 to 0.5,
+ *      then the negative side of the range has expanded to 150% of its
+ *      original size while the positive side of the range has shrunk to
+ *      50% of its size; if the polled value is less than the new center
+ *      it is multiplied by 1.5, if the polled value is greater than the
+ *      new center it is multiplied by 0.5, and if the polled value is
+ *      exactly the new center then it is left unchanged.</li>
+ *  <li>Finally, clamp the polled value into its original range (again,
+ *      this is [0,1] for buttons and [-1,1] for everything else); this
+ *      is to prevent any floating point precision loss from placing the
+ *      value just outside of the allowed range.</li>
+ * </ol>
+ * As you can see from the above information, centering is the last operation
+ * and the most likely to cause floating point precision loss issues.  It is
+ * strongly recommended that centering not be changed dynamically in the
+ * presence of bound values for this reason.
  * 
  * @author Andrew Hayden
  */
@@ -50,14 +116,14 @@ public class ComponentConfiguration implements Cloneable
     /**
      * The value at the center of the range.
      */
-    float centerValue;
+    float centerValueOverride;
 
     /**
      * "Map" whose keys are discrete floats produced by this control, if it
      * is digital, and whose values are the user-defined symbols associated
      * therewith.
      */
-    final Map<Float, Integer> valueIdsByValue;
+    Map<Float, Integer> valueIdsByValue;
 
     /**
      * User-defined ID for this component.
@@ -75,7 +141,7 @@ public class ComponentConfiguration implements Cloneable
         granularity = 0f;
         isInverted = false;
         isTurboEnabled = false;
-        centerValue = 0f;
+        centerValueOverride = 0f;
         valueIdsByValue = new HashMap<Float, Integer>();
     }
 
@@ -93,7 +159,7 @@ public class ComponentConfiguration implements Cloneable
         granularity = source.granularity;
         isInverted = source.isInverted;
         isTurboEnabled = source.isTurboEnabled;
-        centerValue = source.centerValue;
+        centerValueOverride = source.centerValueOverride;
         valueIdsByValue = new HashMap<Float, Integer>(source.valueIdsByValue);
     }
 
@@ -112,7 +178,7 @@ public class ComponentConfiguration implements Cloneable
         clone.granularity = granularity;
         clone.isInverted = isInverted;
         clone.isTurboEnabled = isTurboEnabled;
-        clone.centerValue = centerValue;
+        clone.centerValueOverride = centerValueOverride;
         clone.valueIdsByValue.putAll(
                 valueIdsByValue);
         return clone;
@@ -143,7 +209,7 @@ public class ComponentConfiguration implements Cloneable
         }
 
         destination.put(prefix + ".userDefinedId", Integer.toString(userDefinedId));
-        destination.put(prefix + ".centerValue", ConfigurationUtils.floatToHexBitString(centerValue));
+        destination.put(prefix + ".centerValue", ConfigurationUtils.floatToHexBitString(centerValueOverride));
         destination.put(prefix + ".deadZoneLowerBound", ConfigurationUtils.floatToHexBitString(deadZoneLowerBound));
         destination.put(prefix + ".deadZoneUpperBound", ConfigurationUtils.floatToHexBitString(deadZoneUpperBound));
         destination.put(prefix + ".granularity", ConfigurationUtils.floatToHexBitString(granularity));
@@ -193,7 +259,7 @@ public class ComponentConfiguration implements Cloneable
     {
         userDefinedId = ConfigurationUtils.getInteger(
                 source, prefix + ".userDefinedId");
-        centerValue = ConfigurationUtils.getFloat(
+        centerValueOverride = ConfigurationUtils.getFloat(
                 source, prefix + ".centerValue");
         deadZoneLowerBound = ConfigurationUtils.getFloat(
                 source, prefix + ".deadZoneLowerBound");
@@ -281,7 +347,15 @@ public class ComponentConfiguration implements Cloneable
      */
     public final int getValueId(float value)
     {
-        return valueIdsByValue.get(value);
+        Integer result = valueIdsByValue.get(value);
+        if (result == null)
+        {
+            return Integer.MIN_VALUE;
+        }
+        else
+        {
+            return result;
+        }
     }
 
     /**
@@ -370,6 +444,11 @@ public class ComponentConfiguration implements Cloneable
      * bound, an exception is thrown.  If both bounds are equal, this
      * indicates that there is only one dead zone value and it is the
      * value specified.
+     * <p>
+     * For information on how inversion, granularity, dead zones and
+     * center values interact, please refer to the class-level documentation.
+     * <p>
+     * It is not permissible to have one bound set and the other cleared.
      * 
      * @param lowerBound the new lower bound to set.  If NaN, the
      * bound is cleared; otherwise, the bound is set
@@ -421,6 +500,14 @@ public class ComponentConfiguration implements Cloneable
             }
         }
 
+        if ((lowerBound == Float.NaN || upperBound == Float.NaN)
+                && (lowerBound != Float.NaN || upperBound != Float.NaN))
+        {
+            // Only one bound was set.  Unacceptable.
+            throw new IllegalArgumentException("lower bound and upper bound "
+                    + "must be set or cleared together.");
+        }
+
         // Set bounds to NaN so that this method cannot cause a logical
         // error if the new lower bound is greater than the old upper bound,
         // or if the new upper bound is less than the old lower bound.
@@ -444,30 +531,45 @@ public class ComponentConfiguration implements Cloneable
      * Returns the center value for this component.
      * 
      * @return the center value for this component
-     * @see #setCenterValue(float)
+     * @see #setCenterValueOverride(float)
      */
-    public final float getCenterValue()
+    public final float getCenterValueOverride()
     {
-        return centerValue;
+        return centerValueOverride;
     }
 
     /**
      * Sets the center value for this component.
      * <p>
-     * The center value defaults to <code>0</code> and represents the neutral
-     * position of the component.  Relative components may not have a center
+     * The center value override defaults to {@link Float#NaN} and represents
+     * the default center value for the component (i.e., the neutral
+     * position of the component).  Relative components may not have a center
      * value; for example, a wheel may produce only relative measurements
      * as it is turned and therefore may not have a "center" value, since there
      * is no notion of an absolute value in this sense.
      * <p>
      * The center value is important when considering granularity.
      * See {@link #setGranularity(float)} for more information.
+     * <p>
+     * For information on how inversion, granularity, dead zones and
+     * center values interact, please refer to the class-level documentation.
      * 
-     * @param centerValue the new center value to set
+     * @param centerValueOverride the new center value overrideto set;
+     * to clear the center value override, set to {@link Float#NaN}.
+     * Valid non-NaN values must be in the range [-1,1].
      */
-    public void setCenterValue(float centerValue)
+    public void setCenterValueOverride(float centerValueOverride)
     {
-        this.centerValue = centerValue;
+        if (centerValueOverride != Float.NaN)
+        {
+            if (centerValueOverride < -1 || 1 < centerValueOverride)
+            {
+                throw new IllegalArgumentException(
+                        "Center value override must be in the range [-1,1]: "
+                        + centerValueOverride);
+            }
+        }
+        this.centerValueOverride = centerValueOverride;
     }
 
     /**
@@ -522,13 +624,27 @@ public class ComponentConfiguration implements Cloneable
      * granularity to be cleared.  If granularity is cleared, then no
      * binning is performed and every change of value that is detected by
      * the system may potentially generate a value-changed event.
+     * <p>
+     * For information on how inversion, granularity, dead zones and
+     * center values interact, please refer to the class-level documentation.
      * 
      * @param granularity the new granularity to set, which must be in the
      * range [0, 1] or must be the value {@link Float#NaN}, in which case
      * the granularity is cleared
+     * @throws IllegalArgumentException if the value is not
+     * {@link Float#NaN} and is outside the range [0,1]
      */
     public void setGranularity(float granularity)
     {
+        if (granularity != Float.NaN)
+        {
+            if (granularity < 0 || 1 < granularity)
+            {
+                throw new IllegalArgumentException(
+                        "Granularity must be in the range [0,1]: "
+                        + granularity);
+            }
+        }
         this.granularity = granularity;
     }
 
@@ -556,6 +672,9 @@ public class ComponentConfiguration implements Cloneable
      * whether the component is inverted or not, and simply rely on this
      * configuration to swap the values for them (such that, for example,
      * "up" would become "down" and "down" would become "up").
+     * <p>
+     * For information on how inversion, granularity, dead zones and
+     * center values interact, please refer to the class-level documentation.
      * 
      * @param isInverted whether or not the component should be inverted
      */
@@ -600,6 +719,9 @@ public class ComponentConfiguration implements Cloneable
      * this can also allow for a combination of fine-grained and mass-event
      * behaviors in a semless, convenient integration.  See
      * {@link #setTurboDelayMillis(long)} for more information.
+     * <p>
+     * Turbo mode is meaningless for components of type
+     * {@link ComponentType#AXIS}.
      * 
      * @param isTurboEnabled whether or not the component should be in
      * turbo mode
