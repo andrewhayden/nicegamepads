@@ -432,9 +432,30 @@ final class ConfigurationUtils
             granularity = source.granularity;
             isInverted = source.isInverted;
             isTurboEnabled = source.isTurboEnabled;
-            centerValue = source.centerValue;
+            centerValueOverride = source.centerValueOverride;
             valueIdsByValue.putAll(
                     source.valueIdsByValue);
+        }
+
+        /**
+         * Constructs a shallow copy of the specified source object.
+         * <p>
+         * The new object has a different hashcode than the source but
+         * shares its contents instead of making a pointless copy.
+         * 
+         * @param source the cource to copy
+         */
+        ImmutableComponentConfiguration(ImmutableComponentConfiguration source)
+        {
+            super();
+            userDefinedId = source.userDefinedId;
+            deadZoneLowerBound = source.deadZoneLowerBound;
+            deadZoneUpperBound = source.deadZoneUpperBound;
+            granularity = source.granularity;
+            isInverted = source.isInverted;
+            isTurboEnabled = source.isTurboEnabled;
+            centerValueOverride = source.centerValueOverride;
+            valueIdsByValue = source.valueIdsByValue;
         }
 
         /**
@@ -455,7 +476,7 @@ final class ConfigurationUtils
             // would create a MUTABLE INSTANCE of this class.
             ImmutableComponentConfiguration clone =
                 new ImmutableComponentConfiguration();
-            clone.centerValue = centerValue;
+            clone.centerValueOverride = centerValueOverride;
             clone.deadZoneLowerBound = deadZoneLowerBound;
             clone.deadZoneUpperBound = deadZoneUpperBound;
             clone.granularity = granularity;
@@ -468,7 +489,7 @@ final class ConfigurationUtils
         }
 
         @Override
-        public final void setCenterValue(float centerValue)
+        public final void setCenterValueOverride(float centerValue)
         {
             throw new UnsupportedOperationException(
                 "This configuration is read-only.");
@@ -583,6 +604,27 @@ final class ConfigurationUtils
                                     source.getSubControllerConfigurations()
                                         .get(subControllers[index])));
             }
+        }
+
+        /**
+         * Constructs a shallow copy of the specified source object.
+         * <p>
+         * The new object has a different hashcode than the source but
+         * shares its contents instead of making a pointless copy.
+         * 
+         * @param source the cource to copy
+         */
+        ImmutableControllerConfiguration(ImmutableControllerConfiguration source)
+        {
+            // Copy will share the cache of component locations by controller
+            // config.  This is exactly what should happen, since we are sharing
+            // existing config objects.
+            Controller controller = source.getController();
+            setCachedConfigurationsByComponent(source.getCachedConfigurationsByComponent());
+            setComponentConfigurations(source.getComponentConfigurations());
+            setController(controller);
+            setControllerTypeCode(source.getControllerTypeCode());
+            setSubControllerConfigurations(source.getSubControllerConfigurations());
         }
 
         /**

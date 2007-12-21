@@ -44,7 +44,7 @@ public class ControllerConfiguration implements Cloneable
      * This is used to speed binding and looking up configurations for
      * components nested within a subcontroller.
      */
-    private final Map<Component, ControllerConfiguration>
+    private Map<Component, ControllerConfiguration>
         cachedConfigurationsByComponent =
             new HashMap<Component, ControllerConfiguration>();
 
@@ -673,5 +673,30 @@ public class ControllerConfiguration implements Cloneable
     final int getControllerTypeCode()
     {
         return controllerTypeCode;
+    }
+
+    /**
+     * Not for public use.
+     * <p>
+     * Package-level access to access the cached configurations map.
+     * 
+     * @return the cached configurations map
+     */
+    final Map<Component, ControllerConfiguration> getCachedConfigurationsByComponent()
+    {
+        return cachedConfigurationsByComponent;
+    }
+
+    /**
+     * Not for public use.
+     * <p>
+     * Package-level access to access the cached configurations map.
+     * 
+     * @param cachedConfigurationsByComponent new value for the map
+     */
+    final void setCachedConfigurationsByComponent(
+            Map<Component, ControllerConfiguration> cachedConfigurationsByComponent)
+    {
+        this.cachedConfigurationsByComponent = cachedConfigurationsByComponent;
     }
 }
