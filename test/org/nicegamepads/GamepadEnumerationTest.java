@@ -14,28 +14,5 @@ public class GamepadEnumerationTest
             System.out.println("gamepad: " + c.getName() + "; hash=" + ControllerUtils.generateTypeCode(c));
             System.out.println("on port: " + c.getPortNumber() + " (port type=" + c.getPortType() + ")");
         }
-
-        Controller controller = gamepads.get(0);
-        ControllerConfiguration config = new ControllerConfiguration(controller);
-        //ControllerUtils.loadDeadZoneDefaults(controller, config, true);
-        ControllerUtils.loadGlobalDeadZones(controller, config, true, -0.05f, 0.05f);
-        System.out.println(config);
-        ControllerConfigurator configurator =
-            new ControllerConfigurator(controller, config, true);
-        
-        ComponentEvent event = null;
-        try
-        {
-            while(true)
-            {
-                event = configurator.identifyComponent();
-                System.out.println("Component identified: " + event);
-            }
-        }
-        catch (InterruptedException e)
-        {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
     }
 }
