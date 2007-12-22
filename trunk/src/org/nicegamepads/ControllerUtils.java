@@ -377,6 +377,7 @@ public final class ControllerUtils
             if (results == null)
             {
                 // Calculate and cache.
+                results = new ArrayList<Component>();
                 for (Component component : controller.getComponents())
                 {
                     results.add(component);
@@ -683,5 +684,94 @@ public final class ControllerUtils
         // mice that also fail to report themselves as mice.  This should be
         // (extremely) rare.
         return true;
+    }
+
+    /**
+     * Load the default dead zones for the controller's components.
+     * 
+     * @param controller the controller to load defaults for
+     * @param configuration the configuration to update
+     * @param deep if <code>true</code>, descends into all subcontrollers
+     * and sets the defaults for those components as well; otherwise,
+     * only immediate children of the specifiec controller are processed.
+     * This method skips components that aren't configured in the specified
+     * controller configuration (for example, if the configuration was
+     * created shallow and deep is set here to <code>true</code>, in which
+     * case the controller configuration doesn't have configurations for
+     * its deep children)
+     */
+    public final static void loadDeadZoneDefaults(
+            Controller controller, ControllerConfiguration configuration,
+            boolean deep)
+    {
+        List<Component> eligibleComponents = getComponents(controller, deep);
+        for (Component component : eligibleComponents)
+        {
+            ComponentConfiguration componentConfig =
+                configuration.getConfiguration(component);
+            if (componentConfig != null)
+            {
+                float defaultDeadZone = component.getDeadZone();
+                if (!Float.isNaN(defaultDeadZone)
+                        && !Float.isInfinite(defaultDeadZone))
+                {
+                    // Valid float found.
+                    // We only care about the absolute value; kill negatives.
+                    defaultDeadZone = Math.abs(defaultDeadZone);
+                    // Sanity check, clamp to range [0,1]
+                    defaultDeadZone = Math.min(defaultDeadZone, 1.0f);
+                    // Configure
+                    componentConfig.setDeadZoneBounds(
+                        -1f * defaultDeadZone, defaultDeadZone);
+                }
+                else
+                {
+                    componentConfig.setDeadZoneBounds(
+                            Float.NaN, Float.NaN);
+                }
+            }
+        }
+    }
+
+    /**
+     * Load the specified dead zones for the controller's components.
+     * <p>
+     * This is useful for hyper-sensitive controllers that don't report
+     * reasonable dead zones.  A small range such as
+     * <code>[-0.05f, 0.05f]</code> (that is, 5% of the total range)
+     * is usually a good choice, as it will generally compensate for random
+     * jitter without making the device feel unresponsive.  Different
+     * controllers may vary significantly in this regard, however, so some
+     * experimentation may be necessary.
+     * <p>
+     * Note that the bounds are constrained by the requirements set forth
+     * in {@link ComponentConfiguration#setDeadZoneBounds(float, float)}.
+     * 
+     * @param controller the controller to load dead zones for
+     * @param configuration the configuration to update
+     * @param deep if <code>true</code>, descends into all subcontrollers
+     * and sets the defaults for those components as well; otherwise,
+     * only immediate children of the specifiec controller are processed.
+     * This method skips components that aren't configured in the specified
+     * controller configuration (for example, if the configuration was
+     * created shallow and deep is set here to <code>true</code>, in which
+     * case the controller configuration doesn't have configurations for
+     * its deep children)
+     */
+    public final static void loadGlobalDeadZones(
+            Controller controller, ControllerConfiguration configuration,
+            boolean deep, float lowerBound, float upperBound)
+    {
+        List<Component> eligibleComponents = getComponents(controller, deep);
+        for (Component component : eligibleComponents)
+        {
+            ComponentConfiguration componentConfig =
+                configuration.getConfiguration(component);
+            if (componentConfig != null)
+            {
+                componentConfig.setDeadZoneBounds(
+                        lowerBound, upperBound);
+            }
+        }
     }
 }

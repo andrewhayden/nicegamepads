@@ -6,6 +6,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import net.java.games.input.Controller;
 
@@ -57,6 +63,22 @@ public class ControllerPoller
         new CopyOnWriteArrayList<ComponentPollingListener>();
 
     /**
+     * Polling service that handles polling of the controller.
+     */
+    private final static ScheduledExecutorService pollingService =
+        Executors.newSingleThreadScheduledExecutor();
+
+    /**
+     * Used to call the {@link #poll()} method periodically.
+     */
+    private final PollingInvoker pollingInvoker;
+
+    /**
+     * Currently-scheduled polling task, if any.
+     */
+    private ScheduledFuture<?> pollingTask = null;
+
+    /**
      * Constructs a new poller for the specified controller, optionally
      * descending into all subcontrollers.
      * <p>
@@ -76,6 +98,42 @@ public class ControllerPoller
         // This call is important!  Don't remove it!
         // It has a side effect
         ControllerUtils.getComponents(controller, true);
+
+        pollingInvoker = new PollingInvoker(this);
+    }
+
+    /**
+     * Requests that <strong>all</strong> polling cease in the near future.
+     * Events that are currently enqueued are allowed to start and complete.
+     */
+    public final static void shutdownAllPolling()
+    {
+        pollingService.shutdown();
+    }
+
+    /**
+     * Requests that <strong>all</strong> polling cease as soon as possible.
+     * All currently-executing events are asked to halt (via interrupt)
+     * and all enqueued events are dropped on the floor.
+     */
+    public final static void shutdownAllPollingNow()
+    {
+        pollingService.shutdownNow();
+    }
+
+    /**
+     * Waits for all polling to cease.
+     * 
+     * @param timeout the maximum amount of time to wait for termination
+     * @param unit the unit of time to wait for
+     * @return <code>true</code> if all polling has ceased when this method
+     * returns; otherwise, <code>false</code> if the timeout expires first
+     * @throws InterruptedException if interrupted while waiting
+     */
+    public final static boolean awaitTermination(long timeout, TimeUnit unit)
+    throws InterruptedException
+    {
+        return pollingService.awaitTermination(timeout, unit);
     }
 
     /**
@@ -184,21 +242,110 @@ public class ControllerPoller
     }
 
     /**
+     * Starts or resumes polling the controller associated with this poller.
+     * <p>
+     * If polling is already running, cancels the next polling interval and
+     * reschedules polling at the specified interval.
+     * <p>
+     * In any case, polling will start after the specified interval has
+     * passed.
+     * 
+     * @param interval the interval at which to poll
+     * @param unit the time unit for the interval
+     */
+    public final void startPolling(long interval, TimeUnit unit)
+    {
+        synchronized(pollingInvoker)
+        {
+            if (pollingTask != null)
+            {
+                pollingTask.cancel(false);
+            }
+            pollingTask = pollingService.scheduleAtFixedRate(
+                    pollingInvoker, interval, interval, unit);
+        }
+    }
+
+    /**
+     * Cancels any outstanding polling schedules immediately and stops all
+     * future polling.  No further polling will be performed.
+     * <p>
+     * Note that this method may result in one last polling event executing
+     * if the request to stop overlaps with such an event.  If you need
+     * to guarantee that polling has terminated by the time this call
+     * returns, use {@link #stopPollingAndWait(long, TimeUnit)} instead.
+     */
+    public final void stopPolling()
+    {
+        synchronized(pollingInvoker)
+        {
+            if (pollingTask != null)
+            {
+                pollingTask.cancel(false);
+            }
+            pollingTask = null;
+        }
+    }
+
+    /**
+     * Cancels any outstanding polling schedules immediately waits until
+     * the currently-executing polling process, if any, has completed.
+     * After this method has returned, it is guaranteed that no further
+     * polling events will be enqueued for dispatch (any unprocessed
+     * events will still be fired).
+     */
+    public final void stopPollingAndWait(long interval, TimeUnit unit)
+    throws InterruptedException, ExecutionException, TimeoutException
+    {
+        synchronized(pollingInvoker)
+        {
+            try
+            {
+                if (pollingTask != null)
+                {
+                    pollingTask.cancel(false);
+                    pollingTask.get(interval, unit);
+                }
+            }
+            finally
+            {
+                pollingTask = null;
+            }
+        }
+    }
+
+    /**
      * Forces this controller to poll all of its components immediately.
      * <p>
      * Polling will dispatch events for the components as necessary.
+     * 
+     * @throws IllegalStateException if no configuration has been set for
+     * this poller
      */
-    public final void poll()
+    private final void poll()
     {
         // Start by obtaining a copy of the current configuration.  We will
         // use only this copy for our entire method lifetime.
         // Since the source is volatile we are guaranteed that we are getting
         // the latest copy here.
         final ControllerConfiguration config = volatileConfiguration;
+        if (config == null)
+        {
+            throw new IllegalStateException("Null configuration.");
+        }
+
         ComponentConfiguration componentConfig = null;
         final long now = System.currentTimeMillis();
 
-        // Poll each component.
+        // Poll the controller
+        boolean controllerOk = controller.poll();
+        if (!controllerOk)
+        {
+            // FIXME: raise event!
+            stopPolling();
+        }
+
+        // Process each component.
         for (ComponentState state : controllerState.componentStates)
         {
             // Look up configuration for this component
@@ -206,11 +353,11 @@ public class ControllerPoller
             // Poll the value
             float polledValue = state.component.getPollData();
             // Transform according to configuration rules
-            polledValue = transform(polledValue, componentConfig, state.type);
+            polledValue = transform(polledValue, componentConfig, state.componentType);
             // Get any user ID bound to this value
             boolean forceFireTurboEvent = false;
 
-            switch (state.type)
+            switch (state.componentType)
             {
                 case BUTTON:
                 case KEY:
@@ -241,7 +388,7 @@ public class ControllerPoller
                     break;
                 default:
                     throw new RuntimeException(
-                            "Unsupported component type: " + state.type);
+                            "Unsupported component type: " + state.componentType);
             }
 
             ComponentEvent event = makeEvent(state, componentConfig);
@@ -313,7 +460,7 @@ public class ControllerPoller
     {
         // STEP 1: Granularity
         // Get granularity bins and collapse.
-        if (componentConfig.granularity != Float.NaN)
+        if (!Float.isNaN(componentConfig.granularity))
         {
             float[] bins = getGranularityBins(componentConfig.granularity);
             int index = Arrays.binarySearch(bins, polledValue);
@@ -340,7 +487,7 @@ public class ControllerPoller
         }
 
         // STEP 2: Dead zone
-        if (componentConfig.deadZoneLowerBound != Float.NaN)
+        if (!Float.isNaN(componentConfig.deadZoneLowerBound))
         {
             // We have a dead zone to consider.
             if (componentConfig.deadZoneLowerBound <= polledValue
@@ -367,7 +514,7 @@ public class ControllerPoller
         }
 
         // STEP 4: Recentering
-        if (componentConfig.centerValueOverride != Float.NaN
+        if (!Float.isNaN(componentConfig.centerValueOverride)
                 && componentConfig.centerValueOverride != 0f)
         {
             float positiveExpansion;
@@ -585,5 +732,35 @@ public class ControllerPoller
                 }
             }
         });
+    }
+
+    /**
+     * Utility class to invoke polling on a controller poller.
+     * 
+     * @author Andrew Hayden
+     */
+    private final static class PollingInvoker extends LoggingRunnable
+    {
+        /**
+         * The poller to invoke polling on.
+         */
+        private final ControllerPoller poller;
+
+        /**
+         * Constructs a new invoker that will invoke polling on the specified
+         * controller poller.
+         * 
+         * @param poller the poller to invoke polling on
+         */
+        PollingInvoker (ControllerPoller poller)
+        {
+            this.poller = poller;
+        }
+
+        @Override
+        protected final void runInternal()
+        {
+            poller.poll();
+        }
     }
 }

@@ -48,7 +48,7 @@ import java.util.TreeSet;
  *      dead zone (boundaries inclusive), set the polled value to zero.
  *      Note that this means that the dead zone boundaries are absolute,
  *      and are not affected by any centering work.</li>
- *  <li>If inverstion is on, flip the polled value around the center of the
+ *  <li>If inversion is on, flip the polled value around the center of the
  *      range.  For buttons this means that 0 becomes 1 and 1 becomes 0; for all
  *      other types of controls, this means that -1 becomes 1 and 1 becomes
  *      -1 (0 stays as 0).  Note that this means that inversion is absolute,
@@ -85,38 +85,38 @@ public class ComponentConfiguration implements Cloneable
     /**
      * The lower bound of the dead zone, if any (inclusive).
      */
-    float deadZoneLowerBound;
+    float deadZoneLowerBound = Float.NaN;
 
     /**
      * The upper bound of the dead zone, if any (inclusive).
      */
-    float deadZoneUpperBound;
+    float deadZoneUpperBound = Float.NaN;
 
     /**
      * The granularity, if any.
      */
-    float granularity;
+    float granularity = Float.NaN;
 
     /**
      * Whether or not this is an inverted configuration.
      */
-    boolean isInverted;
+    boolean isInverted = false;
 
     /**
      * Whether or not turbo mode is enabled.
      */
-    boolean isTurboEnabled;
+    boolean isTurboEnabled = false;
 
     /**
      * How long, in milliseconds, after which a pushed button automatically
      * enters turbo mode.
      */
-    long turboDelayMillis;
+    long turboDelayMillis = 0L;
 
     /**
      * The value at the center of the range.
      */
-    float centerValueOverride;
+    float centerValueOverride = Float.NaN;
 
     /**
      * "Map" whose keys are discrete floats produced by this control, if it
@@ -128,20 +128,13 @@ public class ComponentConfiguration implements Cloneable
     /**
      * User-defined ID for this component.
      */
-    int userDefinedId;
+    int userDefinedId = Integer.MIN_VALUE;
 
     /**
      * Creates a new, empty configuration with default values.
      */
     ComponentConfiguration()
     {
-        userDefinedId = 0;
-        deadZoneLowerBound = 0f;
-        deadZoneUpperBound = 0f;
-        granularity = 0f;
-        isInverted = false;
-        isTurboEnabled = false;
-        centerValueOverride = 0f;
         valueIdsByValue = new HashMap<Float, Integer>();
     }
 
@@ -852,5 +845,46 @@ public class ComponentConfiguration implements Cloneable
     final Map<Float, Integer> getValueIdsByValue()
     {
         return valueIdsByValue;
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder buffer = new StringBuilder();
+        buffer.append(ComponentConfiguration.class.getName());
+        buffer.append(": [");
+        buffer.append("userDefinedId=");
+        buffer.append(userDefinedId);
+        buffer.append(", granularity=");
+        buffer.append(granularity);
+        buffer.append(", deadZoneLowerBound=");
+        buffer.append(deadZoneLowerBound);
+        buffer.append(", deadZoneUpperBound=");
+        buffer.append(deadZoneUpperBound);
+        buffer.append(", isInverted=");
+        buffer.append(isInverted);
+        buffer.append(", centerValueOverride=");
+        buffer.append(centerValueOverride);
+        buffer.append(", isTurboEnabled=");
+        buffer.append(isTurboEnabled);
+        buffer.append(", turboDelayMillis=");
+        buffer.append(turboDelayMillis);
+        buffer.append(", valueIdsByValue=[");
+        Iterator<Map.Entry<Float, Integer>> iterator =
+            valueIdsByValue.entrySet().iterator();
+        while(iterator.hasNext())
+        {
+            Map.Entry<Float, Integer> entry = iterator.next();
+            buffer.append(entry.getKey());
+            buffer.append("=");
+            buffer.append(entry.getValue());
+            if (iterator.hasNext())
+            {
+                buffer.append(",");
+            }
+        }
+        buffer.append("]");
+        buffer.append("]");
+        return buffer.toString();
     }
 }
