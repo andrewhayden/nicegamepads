@@ -25,6 +25,12 @@ public class ComponentEvent
     public final Component sourceComponent;
 
     /**
+     * The type of the source component, if the source component is
+     * not <code>null</code>.
+     */
+    public final ComponentType sourceComponentType;
+
+    /**
      * The user-defined ID for the source component, if any; otherwise,
      * {@link Integer#MIN_VALUE}.
      */
@@ -78,5 +84,41 @@ public class ComponentEvent
         this.currentValueId = currentValueId;
         this.previousValue = previousValue;
         this.previousValueId = previousValueId;
+
+        if (sourceComponent != null)
+        {
+            this.sourceComponentType =
+                ControllerUtils.getComponentType(sourceComponent);
+        }
+        else
+        {
+            this.sourceComponentType = null;
+        }
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder buffer = new StringBuilder();
+        buffer.append(ComponentEvent.class.getName());
+        buffer.append(": [");
+        buffer.append("sourceController=");
+        buffer.append(sourceController);
+        buffer.append(", sourceComponent=");
+        buffer.append(sourceComponent);
+        buffer.append(", sourceComponentType=");
+        buffer.append(sourceComponentType);
+        buffer.append(", userDefinedComponentId=");
+        buffer.append(userDefinedComponentId);
+        buffer.append(", previousValue=");
+        buffer.append(previousValue);
+        buffer.append(", previousValueId=");
+        buffer.append(previousValueId);
+        buffer.append(", currentValue=");
+        buffer.append(currentValue);
+        buffer.append(", currentValueId=");
+        buffer.append(currentValueId);
+        buffer.append("]");
+        return buffer.toString();
     }
 }

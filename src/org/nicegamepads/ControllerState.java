@@ -47,7 +47,7 @@ final class ControllerState
         int index = 0;
         for (Component component : allComponents)
         {
-            componentStates[index] = new ComponentState(component);
+            componentStates[index++] = new ComponentState(component);
         }
     }
 }

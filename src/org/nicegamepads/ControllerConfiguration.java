@@ -83,6 +83,7 @@ public class ControllerConfiguration implements Cloneable
         // brand new config objects.
 
         // Generate type code immediately.
+        this.controller = controller;
         this.controllerTypeCode = ControllerUtils.generateTypeCode(controller);
 
         // Fill in config info for components
@@ -128,6 +129,7 @@ public class ControllerConfiguration implements Cloneable
      */
     ControllerConfiguration(ControllerConfiguration source)
     {
+        controller = source.controller;
         controllerTypeCode = source.controllerTypeCode;
         componentConfigurations =
             new LinkedHashMap<Component, ComponentConfiguration>(
@@ -185,6 +187,7 @@ public class ControllerConfiguration implements Cloneable
         // Create new blank configuration object
         ControllerConfiguration clone =
             new ControllerConfiguration();
+        clone.controller = controller;
         clone.controllerTypeCode = controllerTypeCode;
         clone.componentConfigurations =
             new LinkedHashMap<Component, ComponentConfiguration>(
@@ -698,5 +701,58 @@ public class ControllerConfiguration implements Cloneable
             Map<Component, ControllerConfiguration> cachedConfigurationsByComponent)
     {
         this.cachedConfigurationsByComponent = cachedConfigurationsByComponent;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    public final String toString()
+    {
+        StringBuilder buffer = new StringBuilder();
+        return toStringHelper(this, buffer, "");
+    }
+
+    /**
+     * Recursively creates a string description of this object.
+     * 
+     * @param configuration the configuration to process recursively
+     * @param buffer the buffer to append to
+     * @param prefix prefix to place in front of each line
+     * @return the string
+     */
+    private final static String toStringHelper(
+            ControllerConfiguration configuration,
+            StringBuilder buffer, String prefix)
+    {
+        buffer.append(prefix);
+        buffer.append(ControllerConfiguration.class.getName());
+        buffer.append(": [");
+        buffer.append("controller=");
+        buffer.append(configuration.controller);
+        buffer.append(", controllerTypeCode=");
+        buffer.append(configuration.controllerTypeCode);
+        buffer.append("]\n");
+        buffer.append(prefix);
+        buffer.append("Component Configurations:\n");
+        for (Map.Entry<Component, ComponentConfiguration> entry :
+            configuration.componentConfigurations.entrySet())
+        {
+            buffer.append(prefix);
+            buffer.append("    ");
+            buffer.append(entry.getKey());
+            buffer.append("=");
+            buffer.append(entry.getValue());
+            buffer.append("\n");
+        }
+        buffer.append("\n");
+        buffer.append(prefix);
+        buffer.append("SubController Configurations:\n");
+        prefix += "    ";
+        for(ControllerConfiguration subControllerConfig :
+            configuration.subControllerConfigurations.values())
+        {
+            buffer.append(toStringHelper(subControllerConfig, buffer, prefix));
+        }
+        return buffer.toString();
     }
 }

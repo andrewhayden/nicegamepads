@@ -17,7 +17,7 @@ final class ComponentState
     /**
      * The type of the component, stored for convenience.
      */
-    final ComponentType type;
+    final ComponentType componentType;
 
     /**
      * Timestamp at which this state was acquired.
@@ -52,7 +52,7 @@ final class ComponentState
     ComponentState(Component component)
     {
         this.component = component;
-        this.type = ControllerUtils.getComponentType(component);
+        this.componentType = ControllerUtils.getComponentType(component);
     }
 
     /**
@@ -84,5 +84,27 @@ final class ComponentState
             // represent a value that can apply to turbo
             lastTurboTimerStart = -1;
         }
+    }
+
+    @Override
+    public final String toString()
+    {
+        StringBuilder buffer = new StringBuilder();
+        buffer.append(ComponentState.class.getName());
+        buffer.append(": [");
+        buffer.append("component=");
+        buffer.append(component);
+        buffer.append(", componentType=");
+        buffer.append(componentType);
+        buffer.append(", currentValue=");
+        buffer.append(currentValue);
+        buffer.append(", lastValue=");
+        buffer.append(lastValue);
+        buffer.append(", currentTimestamp=");
+        buffer.append(currentTimestamp);
+        buffer.append(", lastTurboTimerStart=");
+        buffer.append(lastTurboTimerStart);
+        buffer.append("]");
+        return buffer.toString();
     }
 }

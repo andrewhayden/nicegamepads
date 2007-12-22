@@ -620,10 +620,10 @@ final class ConfigurationUtils
             // config.  This is exactly what should happen, since we are sharing
             // existing config objects.
             Controller controller = source.getController();
-            setCachedConfigurationsByComponent(source.getCachedConfigurationsByComponent());
-            setComponentConfigurations(source.getComponentConfigurations());
             setController(controller);
             setControllerTypeCode(source.getControllerTypeCode());
+            setCachedConfigurationsByComponent(source.getCachedConfigurationsByComponent());
+            setComponentConfigurations(source.getComponentConfigurations());
             setSubControllerConfigurations(source.getSubControllerConfigurations());
         }
 
