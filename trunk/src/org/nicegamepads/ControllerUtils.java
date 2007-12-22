@@ -380,6 +380,11 @@ public final class ControllerUtils
                 results = new ArrayList<Component>();
                 for (Component component : controller.getComponents())
                 {
+                    if (cachedParentControllersByComponent.get(component) == null
+                            && cachedParentControllersByComponent.size() < maxCacheSizeSoftLimit)
+                    {
+                        cachedParentControllersByComponent.put(component, controller);
+                    }
                     results.add(component);
                 }
                 if (cachedDeepComponentsByController.size() < maxCacheSizeSoftLimit)

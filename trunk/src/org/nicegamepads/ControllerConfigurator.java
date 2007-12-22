@@ -2,9 +2,15 @@ package org.nicegamepads;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
+import org.nicegamepads.CalibrationResults.Range;
 
 import net.java.games.input.Component;
 import net.java.games.input.Controller;
@@ -30,7 +36,7 @@ public class ControllerConfigurator
     /**
      * Components that can be configured by this configurator.
      */
-    private final Component[] eligibleComponents;
+    private final Set<Component> eligibleComponents;
 
     /**
      * Synchronization lock.
@@ -43,9 +49,25 @@ public class ControllerConfigurator
     private volatile Thread identificationThread = null;
 
     /**
+     * The current calibration listener, if any.
+     */
+    private volatile CalibrationHelper calibrationHelper = null;
+
+    /**
      * Poller used to poll the controller.
      */
     private final ControllerPoller poller;
+
+    /**
+     * Whether or not we are currently calibrating.
+     */
+    private boolean calibrating = false;
+
+    /**
+     * Listeners.
+     */
+    private final List<CalibrationListener> calibrationListeners
+        = new CopyOnWriteArrayList<CalibrationListener>();
 
     /**
      * Constructs a new configurator to configure the specified controller.
@@ -107,9 +129,29 @@ public class ControllerConfigurator
         {
             this.config = new ControllerConfiguration(defaultConfiguration);
         }
-        eligibleComponents = ControllerUtils.getComponents(
-                controller, deep).toArray(new Component[0]);
+        eligibleComponents = new HashSet<Component>(
+                ControllerUtils.getComponents(controller, deep));
         poller = new ControllerPoller(controller, deep);
+    }
+
+    /**
+     * Adds a listner to be notified of calibration events.
+     * 
+     * @param listener the listener to add
+     */
+    public final void addCalibrationListener(CalibrationListener listener)
+    {
+        calibrationListeners.add(listener);
+    }
+
+    /**
+     * Removes a previously-registered listner.
+     * 
+     * @param listener the listener to remove
+     */
+    public final void removeCalibrationListener(CalibrationListener listener)
+    {
+        calibrationListeners.remove(listener);
     }
 
     /**
@@ -168,10 +210,15 @@ public class ControllerConfigurator
             {
                 throw new IllegalStateException("Already identifying.");
             }
+            if (calibrating)
+            {
+                throw new IllegalStateException("Already calibrating.");
+            }
+
             identificationThread = Thread.currentThread();
 
             CountDownLatch latch = new CountDownLatch(1);
-            StatefulListener myListener = new StatefulListener(latch);
+            IdentificationListener myListener = new IdentificationListener(latch);
             poller.addComponentPollingListener(myListener);
             poller.setConfiguration(config);
 
@@ -211,12 +258,92 @@ public class ControllerConfigurator
     }
 
     /**
+     * Begins calibration.
+     * <p>
+     * During calibration, the high and low values for each component are
+     * tracked constantly.  The highest and lowest values seen during
+     * calibration are available 
+     */
+    public final void startCalibrating()
+    {
+        synchronized(lock)
+        {
+            if (identificationThread != null)
+            {
+                throw new IllegalStateException("Already identifying.");
+            }
+            if (calibrating)
+            {
+                throw new IllegalStateException("Already calibrating.");
+            }
+
+            // Start calibration.
+            calibrating = true;
+            calibrationHelper = new CalibrationHelper();
+            calibrationHelper.start();
+            poller.addComponentPollingListener(calibrationHelper);
+            poller.setConfiguration(config);
+
+            ControllerManager.eventDispatcher.submit(new LoggingRunnable(){
+                @Override
+                protected void runInternal()
+                {
+                    for (CalibrationListener listener : calibrationListeners)
+                    {
+                        listener.calibrationStarted(controller);
+                    }
+                }
+            });
+
+            // TODO: configurable polling interval
+            poller.startPolling(33L, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    /**
+     * Stops calibrating and returns the results of calibration.
+     * 
+     * @return the results of calibration
+     */
+    public final CalibrationResults stopCalibrating()
+    {
+        synchronized(lock)
+        {
+            if (!calibrating)
+            {
+                throw new IllegalStateException("Not currently calibrating.");
+            }
+
+            // Stop calibration.
+            calibrationHelper.stop();
+            poller.removeComponentPollingListener(calibrationHelper);
+            poller.stopPolling();
+            calibrating = false;
+
+            ControllerManager.eventDispatcher.submit(new LoggingRunnable(){
+                @Override
+                protected void runInternal()
+                {
+                    for (CalibrationListener listener : calibrationListeners)
+                    {
+                        listener.calibrationStopped(
+                                controller,
+                                new CalibrationResults(
+                                        calibrationHelper.results));
+                    }
+                }
+            });
+
+            return calibrationHelper.results;
+        }
+    }
+    /**
      * Listens for polling events and identifies the first component to
      * reach the end of its range and return to neutral.
      * 
      * @author Andrew Hayden
      */
-    private final class StatefulListener implements ComponentPollingListener
+    private final class IdentificationListener implements ComponentPollingListener
     {
         /**
          * Map of whether or not a bound has been reached, by related
@@ -247,7 +374,7 @@ public class ControllerConfigurator
          * 
          * @param latch the latch to count down when done
          */
-        StatefulListener(CountDownLatch latch)
+        IdentificationListener(CountDownLatch latch)
         {
             this.latch = latch;
         }
@@ -256,7 +383,8 @@ public class ControllerConfigurator
         public final void componentPolled(ComponentEvent event)
         {
             //System.out.println(event);
-            if (event.sourceComponent == null || winner != null)
+            if (event.sourceComponent == null || winner != null
+                    || !eligibleComponents.contains(event.sourceComponent))
             {
                 return; // unknown component, or already done.  stop.
             }
@@ -387,6 +515,80 @@ public class ControllerConfigurator
                             .getValueId(qualifyingValue));
                 latch.countDown();
             }
+        }
+    }
+
+    /**
+     * Can perform calibration on a component.
+     * 
+     * @author Andrew Hayden
+     */
+    private final class CalibrationHelper
+    implements ComponentPollingListener
+    {
+        /**
+         * Calibration results.
+         */
+        final CalibrationResults results = new CalibrationResults(controller);
+
+        /**
+         * Whether or not calibration is running.
+         */
+        private volatile boolean running = false;
+
+        /**
+         * Constructs a new calibration listener.
+         */
+        CalibrationHelper()
+        {
+            // Nothing yet...
+        }
+
+        @Override
+        public final void componentPolled(final ComponentEvent event)
+        {
+            // Don't update any more if we've been asked to stop.
+            if (!running || event.sourceComponent == null
+                    || !eligibleComponents.contains(event.sourceComponent))
+            {
+                return;
+            }
+
+            boolean updated =
+                results.processValue(event.sourceComponent, event.currentValue);
+            if (updated)
+            {
+                final Range newRange = new Range(
+                        results.getRange(event.sourceComponent));
+
+                ControllerManager.eventDispatcher.submit(new LoggingRunnable(){
+                    @Override
+                    protected void runInternal()
+                    {
+                        for (CalibrationListener listener : calibrationListeners)
+                        {
+                            listener.calibrationResultsUpdated(
+                                    controller, event.sourceComponent, newRange);
+                        }
+                    }
+                });
+            }
+        }
+
+        /**
+         * Starts calibration.
+         */
+        final void start()
+        {
+            running = true;
+        }
+
+        /**
+         * Halts calibration.
+         */
+        final void stop()
+        {
+            running = false;
         }
     }
 }
