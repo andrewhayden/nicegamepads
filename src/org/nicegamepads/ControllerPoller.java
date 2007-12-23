@@ -7,8 +7,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -63,12 +61,6 @@ public class ControllerPoller
         new CopyOnWriteArrayList<ComponentPollingListener>();
 
     /**
-     * Polling service that handles polling of the controller.
-     */
-    private final static ScheduledExecutorService pollingService =
-        Executors.newSingleThreadScheduledExecutor();
-
-    /**
      * Used to call the {@link #poll()} method periodically.
      */
     private final PollingInvoker pollingInvoker;
@@ -108,7 +100,7 @@ public class ControllerPoller
      */
     public final static void shutdownAllPolling()
     {
-        pollingService.shutdown();
+        ControllerManager.getPollingService().shutdown();
     }
 
     /**
@@ -118,7 +110,7 @@ public class ControllerPoller
      */
     public final static void shutdownAllPollingNow()
     {
-        pollingService.shutdownNow();
+        ControllerManager.getPollingService().shutdownNow();
     }
 
     /**
@@ -133,7 +125,7 @@ public class ControllerPoller
     public final static boolean awaitTermination(long timeout, TimeUnit unit)
     throws InterruptedException
     {
-        return pollingService.awaitTermination(timeout, unit);
+        return ControllerManager.getPollingService().awaitTermination(timeout, unit);
     }
 
     /**
@@ -261,7 +253,7 @@ public class ControllerPoller
             {
                 pollingTask.cancel(false);
             }
-            pollingTask = pollingService.scheduleAtFixedRate(
+            pollingTask = ControllerManager.getPollingService().scheduleAtFixedRate(
                     pollingInvoker, interval, interval, unit);
         }
     }
@@ -662,7 +654,7 @@ public class ControllerPoller
      */
     private final void dispatchComponentActivated(final ComponentEvent event)
     {
-        ControllerManager.eventDispatcher.submit(new LoggingRunnable(){
+        ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
             @Override
             protected void runInternal()
             {
@@ -682,7 +674,7 @@ public class ControllerPoller
      */
     private final void dispatchComponentDeactivated(final ComponentEvent event)
     {
-        ControllerManager.eventDispatcher.submit(new LoggingRunnable(){
+        ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
             @Override
             protected void runInternal()
             {
@@ -702,7 +694,7 @@ public class ControllerPoller
      */
     private final void dispatchValueChanged(final ComponentEvent event)
     {
-        ControllerManager.eventDispatcher.submit(new LoggingRunnable(){
+        ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
             @Override
             protected void runInternal()
             {
@@ -722,7 +714,7 @@ public class ControllerPoller
      */
     private final void dispatchComponentPolled(final ComponentEvent event)
     {
-        ControllerManager.eventDispatcher.submit(new LoggingRunnable(){
+        ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
             @Override
             protected void runInternal()
             {
