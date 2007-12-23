@@ -284,7 +284,7 @@ public class ControllerConfigurator
             poller.addComponentPollingListener(calibrationHelper);
             poller.setConfiguration(config);
 
-            ControllerManager.eventDispatcher.submit(new LoggingRunnable(){
+            ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
                 @Override
                 protected void runInternal()
                 {
@@ -320,7 +320,7 @@ public class ControllerConfigurator
             poller.stopPolling();
             calibrating = false;
 
-            ControllerManager.eventDispatcher.submit(new LoggingRunnable(){
+            ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
                 @Override
                 protected void runInternal()
                 {
@@ -561,7 +561,7 @@ public class ControllerConfigurator
                 final Range newRange = new Range(
                         results.getRange(event.sourceComponent));
 
-                ControllerManager.eventDispatcher.submit(new LoggingRunnable(){
+                ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
                     @Override
                     protected void runInternal()
                     {

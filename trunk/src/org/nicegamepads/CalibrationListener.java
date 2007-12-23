@@ -24,6 +24,15 @@ public interface CalibrationListener
      * @param results the current results
      */
     public abstract void calibrationStopped(Controller controller, CalibrationResults results);
+
+    /**
+     * Invoked when calibration results are updated.  Results are updated
+     * in near-realtime as new values are discovered from a component.
+     * 
+     * @param controller the controller being calibrated
+     * @param component the component whose range has been updated
+     * @param range the new range
+     */
     public abstract void calibrationResultsUpdated(Controller controller,
             Component component, CalibrationResults.Range range);
 }
