@@ -8,6 +8,7 @@ public class ComponentIdentificationTest
 {
     public final static void main(String[] args)
     {
+        ControllerManager.initialize();
         List<Controller> gamepads = ControllerUtils.getAllGamepads(false);
         for (Controller c : gamepads)
         {
@@ -17,7 +18,8 @@ public class ComponentIdentificationTest
 
         Controller controller = gamepads.get(0);
         ControllerConfiguration config = new ControllerConfiguration(controller);
-        ControllerUtils.loadDeadZoneDefaults(controller, config, true);
+        //ControllerUtils.loadDeadZoneDefaults(controller, config, true);
+        ControllerUtils.loadGlobalDeadZones(controller, config, true, -0.1f, 0.1f);
         System.out.println(config);
         ControllerConfigurator configurator =
             new ControllerConfigurator(controller, config, true);
@@ -35,5 +37,6 @@ public class ComponentIdentificationTest
         {
             e.printStackTrace();
         }
+        ControllerManager.shutdown();
     }
 }

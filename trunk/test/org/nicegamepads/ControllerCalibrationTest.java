@@ -11,6 +11,7 @@ public class ControllerCalibrationTest
 {
     public final static void main(String[] args)
     {
+        ControllerManager.initialize();
         List<Controller> gamepads = ControllerUtils.getAllGamepads(false);
         for (Controller c : gamepads)
         {
@@ -70,5 +71,6 @@ public class ControllerCalibrationTest
         }
         System.out.println("Asking calibration to stop.");
         configurator.stopCalibrating();
+        ControllerManager.shutdown();
     }
 }
