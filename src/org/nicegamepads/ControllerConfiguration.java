@@ -296,10 +296,38 @@ public class ControllerConfiguration implements Cloneable
      * Saves this configuration to a mapping of (key,value) pairs
      * in an unambiguous manner suitable for user in a Java properties file.
      * <p>
-     * The specified prefix, with an added trailing "." character, is
+     * The specified prefix, possibly with an added trailing "." character, is
+     * prepended to the names of all properties written by this method.
+     * <p>
+     * This is a convenience method to call {@link #saveToMap(String, Map)}
+     * with a <code>null</code> map, which causes that method to generate
+     * and return a new map.
+     * 
+     * @param prefix the prefix to use for creating the property keys.
+     * If <code>null</code> or an empty string, no prefix is set; otherwise,
+     * the specified prefix is prepended to all values.  If the prefix does
+     * not end with a ".", a "." is automatically inserted between the prefix
+     * and the values.
+     * @return a new {@link Map} containing this configuration's
+     * (key,value) pairs
+     */
+    final Map<String, String> saveToMap(String prefix)
+    {
+        return saveToMap(prefix, null);
+    }
+
+    /**
+     * Saves this configuration to a mapping of (key,value) pairs
+     * in an unambiguous manner suitable for user in a Java properties file.
+     * <p>
+     * The specified prefix, possibly with an added trailing "." character, is
      * prepended to the names of all properties written by this method.
      * 
-     * @param prefix the prefix to use for creating the property keys
+     * @param prefix the prefix to use for creating the property keys.
+     * If <code>null</code> or an empty string, no prefix is set; otherwise,
+     * the specified prefix is prepended to all values.  If the prefix does
+     * not end with a ".", a "." is automatically inserted between the prefix
+     * and the values.
      * @param destination optionally, a map into which the properties should
      * be written; if <code>null</code>, a new map is created and returned.
      * Any existing entries with the same names are overwritten.
@@ -308,7 +336,7 @@ public class ControllerConfiguration implements Cloneable
      * pairs); otherwise, a new {@link Map} containing this configuration's
      * (key,value) pairs
      */
-    final Map<String, String> saveToProperties(
+    final Map<String, String> saveToMap(
             String prefix, Map<String,String> destination)
     {
         if (destination == null)
@@ -316,11 +344,24 @@ public class ControllerConfiguration implements Cloneable
             destination = new HashMap<String, String>();
         }
 
-        destination.put(prefix + ".controllerTypeCode",
+        // Check prefix and amend as necessary
+        if (prefix != null && prefix.length() > 0)
+        {
+            if (!prefix.endsWith("."))
+            {
+                prefix = prefix + ".";
+            }
+        }
+        else
+        {
+            prefix = "";
+        }
+
+        destination.put(prefix + "controllerTypeCode",
                 Integer.toString(controllerTypeCode));
-        destination.put(prefix + ".numComponents",
+        destination.put(prefix + "numComponents",
                 Integer.toString(componentConfigurations.size()));
-        destination.put(prefix + ".numSubControllers",
+        destination.put(prefix + "numSubControllers",
                 Integer.toString(subControllerConfigurations.size()));
 
         // Write out all components.
@@ -328,19 +369,50 @@ public class ControllerConfiguration implements Cloneable
         for (ComponentConfiguration config : componentConfigurations.values())
         {
             config.saveToProperties(
-                    prefix + ".component" + counter, destination);
+                    prefix + "component" + counter, destination);
             counter++;
         }
 
         counter = 0;
         for (ControllerConfiguration config : subControllerConfigurations.values())
         {
-            config.saveToProperties(
-                    prefix + ".subController" + counter, destination);
+            config.saveToMap(
+                    prefix + "subController" + counter, destination);
             counter++;
         }
 
         return destination;
+    }
+
+    /**
+     * Returns the type code from the specified mappings as if part of a
+     * complete {@link #loadFromMap(String, Map)}, but does not
+     * load the value into this configuration.
+     * 
+     * @param prefix the prefix, as in {@link #loadFromMap(String, Map)}
+     * @param source the source to lookup the type code in
+     * @return the type code
+     * @throws ConfigurationException if the value isn't found in the
+     * specified source
+     */
+    final static int readControllerTypeCodeFromMap(
+            String prefix, Map<String,String> source)
+    throws ConfigurationException
+    {
+        // Check prefix and amend as necessary
+        if (prefix != null && prefix.length() > 0)
+        {
+            if (!prefix.endsWith("."))
+            {
+                prefix = prefix + ".";
+            }
+        }
+        else
+        {
+            prefix = "";
+        }
+        return ConfigurationUtils.getInteger(
+                source, prefix + "controllerTypeCode");
     }
 
     /**
@@ -352,21 +424,38 @@ public class ControllerConfiguration implements Cloneable
      * fresh, and the references to the old ones are discarded).
      * 
      * @param prefix the prefix to use for retrieving the property keys,
-     * which should be the same as when {@link #saveToProperties(String, Map)}
+     * which should be the same as when {@link #saveToMap(String, Map)}
+     * If <code>null</code> or an empty string, no prefix is used; otherwise,
+     * the specified prefix is assumed to be prepended to all values.
+     * If the prefix does not end with a ".", a "." is automatically appended
+     * for performing the lookups.
      * was originally called to save the configuration
      * @param source properties to read from
      * @throws ConfigurationException if any of the required keys or values
      * are missing or if any of the values are corrupt
      */
-    final void loadFromProperties(String prefix, Map<String, String> source)
+    final void loadFromMap(String prefix, Map<String, String> source)
     throws ConfigurationException
     {
+        // Check prefix and amend as necessary
+        if (prefix != null && prefix.length() > 0)
+        {
+            if (!prefix.endsWith("."))
+            {
+                prefix = prefix + ".";
+            }
+        }
+        else
+        {
+            prefix = "";
+        }
+
         controllerTypeCode = ConfigurationUtils.getInteger(
-                source, prefix + ".controllerTypeCode");
+                source, prefix + "controllerTypeCode");
         int numComponents = ConfigurationUtils.getInteger(
-                source, prefix + ".numComponents");
+                source, prefix + "numComponents");
         int numSubControllers = ConfigurationUtils.getInteger(
-                source, prefix + ".numSubControllers");
+                source, prefix + "numSubControllers");
 
         // Read all components
         Iterator<Component> componentIterator =
@@ -379,7 +468,7 @@ public class ControllerConfiguration implements Cloneable
             // and will stay in-sync.
             ComponentConfiguration config = new ComponentConfiguration();
             config.loadFromProperties(
-                    prefix + ".component" + x, source);
+                    prefix + "component" + x, source);
             componentConfigurations.put(componentIterator.next(), config);
         }
 
@@ -395,8 +484,8 @@ public class ControllerConfiguration implements Cloneable
             Controller controller = controllerIterator.next();
             ControllerConfiguration config =
                 new ControllerConfiguration(controller);
-            config.loadFromProperties(
-                    prefix + ".subController" + x, source);
+            config.loadFromMap(
+                    prefix + "subController" + x, source);
             subControllerConfigurations.put(controller, config);
         }
     }
