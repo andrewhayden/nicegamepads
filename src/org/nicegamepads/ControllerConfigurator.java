@@ -155,16 +155,48 @@ public class ControllerConfigurator
     }
 
     /**
-     * Convenience method to call {@link #identifyComponent(long, TimeUnit)}
-     * without a timeout (wait forever).
+     * Convenience method to call
+     * <code>identifyComponent(0, null, null)</code> (wait forever, identify
+     * any type of component).
      * 
-     * @return see {@link #identifyComponent(long, TimeUnit)}
+     * @return see {@link #identifyComponent(long, TimeUnit, ComponentType))}
      * @throws InterruptedException if interrupted while waiting
      */
     public final ComponentEvent identifyComponent()
     throws InterruptedException
     {
-        return identifyComponent(0L, null);
+        return identifyComponent(0L, null, null, null);
+    }
+
+    /**
+     * Convenience method to call
+     * <code>identifyComponent(0, null, new Set<ComponentType>(
+     * Arrays.asList(new ComponentType[] {requiredType}),
+     * ineligibleComponents)</code>
+     * (wait forever, identify only the specified type of component and
+     * don't identify if the component is listed in the specified set of
+     * ineligible components).
+     * 
+     * @param allowedType optionally, the type of component to be identified
+     * @param ineligibleComponents optionally, a set of components that are
+     * ineligible for identification; typically useful when you want to prevent
+     * the same component from being identified more than once
+     * @return see {@link #identifyComponent(long, TimeUnit, ComponentType))}
+     * @throws InterruptedException if interrupted while waiting
+     */
+    public final ComponentEvent identifyComponent(
+            ComponentType allowedType,
+            Set<Component> ineligibleComponents)
+    throws InterruptedException
+    {
+        Set<ComponentType> typeSet = null;
+        if (allowedType != null)
+        {
+            typeSet = new HashSet<ComponentType>();
+            typeSet.add(allowedType);
+        }
+
+        return identifyComponent(0L, null, typeSet, ineligibleComponents);
     }
 
     /**
@@ -196,12 +228,30 @@ public class ControllerConfigurator
      * non-zero value is in both fields; in all other cases, the current value
      * should be 0.0f since that is the only value that can complete a
      * qualifying event).
+     * <p>
+     * <strong>It is an error to modify the specified set before this method
+     * has returned.</strong>.  That is, this method <em>does not</em> make
+     * a copy of the map.  The reason this is so is because the method is
+     * blocking and the only guarantee that could otherwise be made would be
+     * "it is safe to modify the map only after the method returns".  Since
+     * that doesn't buy us anything, we just don't make a defensive copy at
+     * all.
      * 
+     * @param timeout the maximum amount of time to wait
+     * @param unit the unit of the maximum time to wait
+     * @param allowedTypes (optional) the types of component that may
+     * be identified; input from any other types of component is ignored.
+     * If not specified, any type of component may be identified.
+     * @param ineligibleComponents (optional) the components that are
+     * ineligible for identification; typically used to prevent duplicate
+     * identifications of the same component
      * @return if a qualifying event occurs before the timeout period, the
      * event that contains the qualifying event; otherwise, <code>null</code>
      * @throws InterruptedException  if interrupted while waiting
      */
-    public final ComponentEvent identifyComponent(long timeout, TimeUnit unit)
+    public final ComponentEvent identifyComponent(long timeout, TimeUnit unit,
+            Set<ComponentType> allowedTypes,
+            Set<Component> ineligibleComponents)
     throws InterruptedException
     {
         synchronized(lock)
@@ -218,7 +268,9 @@ public class ControllerConfigurator
             identificationThread = Thread.currentThread();
 
             CountDownLatch latch = new CountDownLatch(1);
-            IdentificationListener myListener = new IdentificationListener(latch);
+            IdentificationListener myListener =
+                new IdentificationListener(
+                        latch, allowedTypes, ineligibleComponents);
             poller.addComponentPollingListener(myListener);
             poller.setConfiguration(config);
 
@@ -365,18 +417,40 @@ public class ControllerConfigurator
         private final CountDownLatch latch;
 
         /**
+         * Optional allowed types of component to identify;
+         * if specified, events from all other types of components are ignored.
+         */
+        private final Set<ComponentType> allowedTypes;
+
+        /**
+         * Optional set of components that are ineligible for identification;
+         * if specified, events from these components are ignored
+         */
+        private final Set<Component> ineligibleComponents;
+
+        /**
          * The component that has won.
          */
         private volatile ComponentEvent winner = null;
 
         /**
          * Constructs a new stateful listener.
+         * <p>
          * 
          * @param latch the latch to count down when done
+         * @param allowedTypes optionally, the set of types that are allowed
+         * to be identified; if <code>null</code>, any type may be identified
+         * @param ineligibleComponents optionally, the set of components
+         * that are ineligible for identification; if <code>null</code>,
+         * any component may be identified so long as its type is allowed
          */
-        IdentificationListener(CountDownLatch latch)
+        IdentificationListener(CountDownLatch latch,
+                Set<ComponentType> allowedTypes,
+                Set<Component> ineligibleComponents)
         {
             this.latch = latch;
+            this.allowedTypes = allowedTypes;
+            this.ineligibleComponents = ineligibleComponents;
         }
 
         @Override
@@ -386,7 +460,24 @@ public class ControllerConfigurator
             if (event.sourceComponent == null || winner != null
                     || !eligibleComponents.contains(event.sourceComponent))
             {
-                return; // unknown component, or already done.  stop.
+                // Unknown component, or already done.  Ignore input.
+                return;
+            }
+
+            if (allowedTypes != null && !allowedTypes.contains(
+                    ControllerUtils.getComponentType(event.sourceComponent)))
+            {
+                // Allowed types are constrained, but component type doesn't
+                // meet the constraints.  Ignore input.
+                return;
+            }
+
+            if (ineligibleComponents != null
+                    && ineligibleComponents.contains(event.sourceComponent))
+            {
+                // Ineligible components have been identified, and source
+                // component is on the list.  Ignore input.
+                return;
             }
 
             boolean boundsHit = false;
