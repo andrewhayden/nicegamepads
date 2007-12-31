@@ -1,7 +1,10 @@
 package org.nicegamepads;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+import net.java.games.input.Component;
 import net.java.games.input.Controller;
 
 public class ComponentIdentificationTest
@@ -25,12 +28,25 @@ public class ComponentIdentificationTest
             new ControllerConfigurator(controller, config, true);
         
         ComponentEvent event = null;
+        Set<Component> identifiedComponents = new HashSet<Component>();
         try
         {
-            while(true)
+            for (int buttonIndex = 0; buttonIndex < 5; buttonIndex++)
             {
-                event = configurator.identifyComponent();
+                System.out.println("Identify a new button...");
+                event = configurator.identifyComponent(
+                        ComponentType.BUTTON, identifiedComponents);
                 System.out.println("Component identified: " + event);
+                identifiedComponents.add(event.sourceComponent);
+            }
+
+            for (int axisIndex = 0; axisIndex < 2; axisIndex++)
+            {
+                System.out.println("Identify a new axis...");
+                event = configurator.identifyComponent(
+                        ComponentType.AXIS, identifiedComponents);
+                System.out.println("Component identified: " + event);
+                identifiedComponents.add(event.sourceComponent);
             }
         }
         catch (InterruptedException e)

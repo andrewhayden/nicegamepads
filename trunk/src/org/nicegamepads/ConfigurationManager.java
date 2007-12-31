@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -53,7 +53,7 @@ public final class ConfigurationManager
      * The default value is ".controller-configs", which is interpreted as a
      * relative path to the current working directory.
      */
-    public final static String DEFAULT_CONFIG_PATH = ".controller-configs";
+    public final static String DEFAULT_CONFIG_PATH = ".controller-configs/";
 
     /**
      * Key under which the {@link #DEFAULT_CONFIG_PATH} may be overridden by
@@ -235,8 +235,10 @@ public final class ConfigurationManager
         buffer.append(MAJOR_VERSION);
         buffer.append(".");
         buffer.append(MINOR_VERSION);
-        buffer.append(" at ");
-        buffer.append(DateFormat.getDateInstance().format(new Date()));
+        buffer.append(" on ");
+        SimpleDateFormat dateFormat =
+            new SimpleDateFormat("EEEE, dd MMMM 'at' hh:mm:ss a, z");
+        buffer.append(dateFormat.format(new Date()));
         buffer.append(".  Do not edit by hand.");
         return buffer.toString();
     }
@@ -383,6 +385,9 @@ public final class ConfigurationManager
      * and {@link #saveConfigurationByType(ControllerConfiguration)}, this
      * method saves the configuration to the exact file specified.
      * <strong>If the file already exists, it will be overwritten.</strong>
+     * <p>
+     * If the directory in which the file is to reside does not exist,
+     * it is created.
      * 
      * @param configuration the configuration to save
      * @param destinationFile the file to save the configuration to
@@ -393,6 +398,13 @@ public final class ConfigurationManager
             ControllerConfiguration configuration, File destinationFile)
     throws IOException
     {
+        File parentDirectory = destinationFile.getParentFile();
+        if (parentDirectory != null && !parentDirectory.exists())
+        {
+            // Make directories first if necessary
+            parentDirectory.mkdirs();
+        }
+
         Map<String,String> asMap = configuration.saveToMap(
                 STANDARD_PREFIX, null);
         asMap.put(STANDARD_PREFIX + ".majorVersion",
