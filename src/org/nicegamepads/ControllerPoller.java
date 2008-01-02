@@ -166,6 +166,13 @@ public class ControllerPoller
             counter++;
         }
 
+        bins = new float[listing.size()];
+        counter = 0;
+        for (Float f : listing)
+        {
+            bins[counter++] = f;
+        }
+
         // List complete!
         granularityBinsByGranularity.put(granularity, bins);
         return bins;

@@ -399,6 +399,139 @@ public final class ControllerUtils
     }
 
     /**
+     * Returns a new, independent list of all of the components that match
+     * the specified type in this controller (and, optionally, any
+     * subcontrollers contained therein).
+     * 
+     * @param controller the controller to search
+     * @param type the type of component to find
+     * @param recursive whether or not to recursively descend into all
+     * subcontrollers
+     * @return a new list containing all of the components matching
+     * the specified type
+     */
+    public final static List<Component> getComponentsByType(
+            Controller controller, ComponentType type, boolean recursive)
+    {
+        List<Component> allComponents = getComponents(controller, recursive);
+        List<Component> matchingComponents = new ArrayList<Component>();
+        for (Component component : allComponents)
+        {
+            if (getComponentType(component) == type)
+            {
+                matchingComponents.add(component);
+            }
+        }
+        return matchingComponents;
+    }
+
+    /**
+     * Returns a new, independent list of all of the relative components
+     * (such as wheels, that have no fixed "home" position to base an
+     * absolute scale on) in this controller (and, optionally, any
+     * subcontrollers contained therein).
+     * 
+     * @param controller the controller to search
+     * @param recursive whether or not to recursively descend into all
+     * subcontrollers
+     * @return a new list containing all of the relative components
+     * @see #getAbsoluteComponents(Controller, boolean)
+     */
+    public final static List<Component> getRelativeComponents(
+            Controller controller, boolean recursive)
+    {
+        List<Component> allComponents = getComponents(controller, recursive);
+        List<Component> matchingComponents = new ArrayList<Component>();
+        for (Component component : allComponents)
+        {
+            if (component.isRelative())
+            {
+                matchingComponents.add(component);
+            }
+        }
+        return matchingComponents;
+    }
+
+    /**
+     * Returns a new, independent list of all of the absolute components
+     * (such as sticks, that have a fixed "home" position to base an
+     * absolute scale on) in this controller (and, optionally, any
+     * subcontrollers contained therein).
+     * 
+     * @param controller the controller to search
+     * @param recursive whether or not to recursively descend into all
+     * subcontrollers
+     * @return a new list containing all of the absolute components
+     * @see #getRelativeComponents(Controller, boolean)
+     */
+    public final static List<Component> getAbsoluteComponents(
+            Controller controller, boolean recursive)
+    {
+        List<Component> allComponents = getComponents(controller, recursive);
+        List<Component> matchingComponents = new ArrayList<Component>();
+        for (Component component : allComponents)
+        {
+            if (!component.isRelative())
+            {
+                matchingComponents.add(component);
+            }
+        }
+        return matchingComponents;
+    }
+
+    /**
+     * Returns a new, independent list of all of the analog (that is,
+     * non-digital) components in this controller
+     * (and, optionally, any subcontrollers contained therein).
+     * 
+     * @param controller the controller to search
+     * @param recursive whether or not to recursively descend into all
+     * subcontrollers
+     * @return a new list containing all of the analog components
+     * @see #getDigitalComponents(Controller, boolean)
+     */
+    public final static List<Component> getAnalogComponents(
+            Controller controller, boolean recursive)
+    {
+        List<Component> allComponents = getComponents(controller, recursive);
+        List<Component> matchingComponents = new ArrayList<Component>();
+        for (Component component : allComponents)
+        {
+            if (component.isAnalog())
+            {
+                matchingComponents.add(component);
+            }
+        }
+        return matchingComponents;
+    }
+
+    /**
+     * Returns a new, independent list of all of the digital (that is,
+     * non-analog) components in this controller
+     * (and, optionally, any subcontrollers contained therein).
+     * 
+     * @param controller the controller to search
+     * @param recursive whether or not to recursively descend into all
+     * subcontrollers
+     * @return a new list containing all of the digital components
+     * @see #getAnalogComponents(Controller, boolean)
+     */
+    public final static List<Component> getDigitalComponents(
+            Controller controller, boolean recursive)
+    {
+        List<Component> allComponents = getComponents(controller, recursive);
+        List<Component> matchingComponents = new ArrayList<Component>();
+        for (Component component : allComponents)
+        {
+            if (!component.isAnalog())
+            {
+                matchingComponents.add(component);
+            }
+        }
+        return matchingComponents;
+    }
+
+    /**
      * Recursively retrieves all components for the specified controller,
      * in a breadth-first search of the controller space.
      * 
@@ -739,7 +872,7 @@ public final class ControllerUtils
     }
 
     /**
-     * Load the specified dead zones for the controller's components.
+     * Sets the specified dead zones for the controller's analog components.
      * <p>
      * This is useful for hyper-sensitive controllers that don't report
      * reasonable dead zones.  A small range such as
@@ -751,8 +884,13 @@ public final class ControllerUtils
      * <p>
      * Note that the bounds are constrained by the requirements set forth
      * in {@link ComponentConfiguration#setDeadZoneBounds(float, float)}.
+     * <p>
+     * This method is equivalent to finding all analog components in
+     * a controller and invoking
+     * {@link ComponentConfiguration#setDeadZoneBounds(float, float)}
+     * for each such component.
      * 
-     * @param controller the controller to load dead zones for
+     * @param controller the controller to set dead zones on
      * @param configuration the configuration to update
      * @param deep if <code>true</code>, descends into all subcontrollers
      * and sets the defaults for those components as well; otherwise,
@@ -761,13 +899,15 @@ public final class ControllerUtils
      * controller configuration (for example, if the configuration was
      * created shallow and deep is set here to <code>true</code>, in which
      * case the controller configuration doesn't have configurations for
-     * its deep children)
+     * its deep children).  It also skips any non-analog components, since
+     * digital components generally do not have a need for dead zones.
      */
-    public final static void loadGlobalDeadZones(
+    public final static void setAnalogDeadZones(
             Controller controller, ControllerConfiguration configuration,
             boolean deep, float lowerBound, float upperBound)
     {
-        List<Component> eligibleComponents = getComponents(controller, deep);
+        List<Component> eligibleComponents =
+            getAnalogComponents(controller, deep);
         for (Component component : eligibleComponents)
         {
             ComponentConfiguration componentConfig =
@@ -776,6 +916,59 @@ public final class ControllerUtils
             {
                 componentConfig.setDeadZoneBounds(
                         lowerBound, upperBound);
+            }
+        }
+    }
+
+    /**
+     * Sets the specified granularity for the controller's analog components.
+     * <p>
+     * This is useful for sensitive controllers that provide more values
+     * than your application can reasonably make use of, and as a result
+     * flood the system with value-changed events that are of little or
+     * no real consequence (e.g., value change from 0.0001 to 0.0002).
+     * Generally, even a small granularity such as 0.2 will greatly
+     * reduce the number of spurious value-changed events encountered.  For
+     * example, a granularity of 0.2 splits the logical range of an analog
+     * component into 10 logical "buckets", 5 on each side of 0 (e.g.,
+     * left and right each have 5 "buckets").
+     * <p>
+     * Different controllers may vary significantly in this regard, so some
+     * experimentation may be necessary.
+     * <p>
+     * Note that the values are constrained by the requirements set forth
+     * in {@link ComponentConfiguration#setGranularity(float)}.
+     * <p>
+     * This method is equivalent to finding all analog components in
+     * a controller and invoking
+     * {@link ComponentConfiguration#setGranularity(float)}
+     * for each such component.
+     * 
+     * @param controller the controller to set granularities on
+     * @param configuration the configuration to update
+     * @param deep if <code>true</code>, descends into all subcontrollers
+     * and sets the defaults for those components as well; otherwise,
+     * only immediate children of the specifiec controller are processed.
+     * This method skips components that aren't configured in the specified
+     * controller configuration (for example, if the configuration was
+     * created shallow and deep is set here to <code>true</code>, in which
+     * case the controller configuration doesn't have configurations for
+     * its deep children).  It also skips any non-analog components, since
+     * digital components generally do not have a need for granularities.
+     */
+    public final static void setAnalogGranularities(
+            Controller controller, ControllerConfiguration configuration,
+            boolean deep, float granularity)
+    {
+        List<Component> eligibleComponents =
+            getAnalogComponents(controller, deep);
+        for (Component component : eligibleComponents)
+        {
+            ComponentConfiguration componentConfig =
+                configuration.getConfiguration(component);
+            if (componentConfig != null)
+            {
+                componentConfig.setGranularity(granularity);
             }
         }
     }
