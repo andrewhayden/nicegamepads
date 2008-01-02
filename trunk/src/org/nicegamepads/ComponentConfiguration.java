@@ -271,18 +271,21 @@ public class ComponentConfiguration implements Cloneable
         // user-defined symbols table.
         String userKeysSerializedList = ConfigurationUtils.getString(
                 source, prefix + ".userDefinedSymbolKeysList");
-        String[] userKeysSerializedArray = userKeysSerializedList.split(",");
-
-        // For each key we found, convert the key back into a IEEE Float and
-        // lookup the corresponding (key,value) pair in the properties to
-        // find the user-defined symbol value for that key.
-        for (String userKeySerialized : userKeysSerializedArray)
+        if (userKeysSerializedList != null && userKeysSerializedList.trim().length() > 0)
         {
-            float trueKey =
-                ConfigurationUtils.floatFromHexBitString(userKeySerialized);
-            int trueValue = ConfigurationUtils.getInteger(source,
-                    prefix + ".userDefinedSymbolKey." + userKeySerialized);
-            valueIdsByValue.put(trueKey, trueValue);
+            String[] userKeysSerializedArray = userKeysSerializedList.split(",");
+    
+            // For each key we found, convert the key back into a IEEE Float and
+            // lookup the corresponding (key,value) pair in the properties to
+            // find the user-defined symbol value for that key.
+            for (String userKeySerialized : userKeysSerializedArray)
+            {
+                float trueKey =
+                    ConfigurationUtils.floatFromHexBitString(userKeySerialized);
+                int trueValue = ConfigurationUtils.getInteger(source,
+                        prefix + ".userDefinedSymbolKey." + userKeySerialized);
+                valueIdsByValue.put(trueKey, trueValue);
+            }
         }
     }
 

@@ -22,7 +22,7 @@ public class ComponentIdentificationTest
         Controller controller = gamepads.get(0);
         ControllerConfiguration config = new ControllerConfiguration(controller);
         //ControllerUtils.loadDeadZoneDefaults(controller, config, true);
-        ControllerUtils.loadGlobalDeadZones(controller, config, true, -0.1f, 0.1f);
+        ControllerUtils.setAnalogDeadZones(controller, config, true, -0.1f, 0.1f);
         System.out.println(config);
         ControllerConfigurator configurator =
             new ControllerConfigurator(controller, config, true);

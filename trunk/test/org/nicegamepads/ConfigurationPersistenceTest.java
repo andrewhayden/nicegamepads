@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import net.java.games.input.Component;
 import net.java.games.input.Controller;
@@ -21,7 +22,8 @@ public class ConfigurationPersistenceTest
         System.out.println("on port: " + controller.getPortNumber() + " (port type=" + controller.getPortType() + ")");
 
         ControllerConfiguration config = new ControllerConfiguration(controller);
-        ControllerUtils.loadGlobalDeadZones(controller, config, true, -0.1f, 0.1f);
+        ControllerUtils.setAnalogDeadZones(controller, config, true, -0.1f, 0.1f);
+        ControllerUtils.setAnalogGranularities(controller, config, true, 0.1f);
         System.out.println(config);
 
         ControllerConfigurator configurator =
@@ -38,8 +40,9 @@ public class ConfigurationPersistenceTest
                 System.out.println("Component identified: " + event);
                 ComponentConfiguration componentConfig =
                     config.getConfigurationDeep(event.sourceComponent);
-                componentConfig.setValueId(event.currentValue, buttonIndex);
-                System.out.println("Bound value " + event.currentValue + " to user defined id " + buttonIndex);
+                componentConfig.setValueId(event.previousValue, buttonIndex);
+                componentConfig.setUserDefinedId(buttonIndex);
+                System.out.println("Bound value " + event.previousValue + " to user defined id " + buttonIndex);
                 identifiedComponents.add(event.sourceComponent);
             }
 
@@ -50,8 +53,9 @@ public class ConfigurationPersistenceTest
                 System.out.println("Component identified: " + event);
                 ComponentConfiguration componentConfig =
                     config.getConfigurationDeep(event.sourceComponent);
-                componentConfig.setValueId(event.currentValue, axisIndex);
-                System.out.println("Bound value " + event.currentValue + " to user defined id " + axisIndex);
+                componentConfig.setValueId(event.previousValue, axisIndex);
+                componentConfig.setUserDefinedId(axisIndex);
+                System.out.println("Bound value " + event.previousValue + " to user defined id " + axisIndex);
                 identifiedComponents.add(event.sourceComponent);
             }
         }
@@ -60,10 +64,83 @@ public class ConfigurationPersistenceTest
             e.printStackTrace();
         }
 
-        ControllerManager.shutdown();
-
+        // Set granularity.
         System.out.println("Saving configuration using default namespace.");
         File saved = ConfigurationManager.saveConfigurationByType(config);
         System.out.println("Saved to: " + saved);
+
+        System.out.println("Loading configuration from disk:");
+        config = ConfigurationManager.loadConfigurationByType(controller);
+        System.out.println(config);
+
+        ControllerPoller poller = new ControllerPoller(controller, true);
+        poller.setConfiguration(config);
+        
+        //final ControllerConfiguration staticConfig = config;
+        ComponentActivationListener activationListener =
+            new ComponentActivationListener(){
+
+            @Override
+            public void componentActivated(ComponentEvent event)
+            {
+                if (event.userDefinedComponentId != Integer.MIN_VALUE)
+                {
+                    System.out.println("Component id " + event.userDefinedComponentId + " activated");
+                }
+                else
+                {
+                    System.out.println("unbound component activated.");
+                }
+            }
+
+            @Override
+            public void componentDeactivated(ComponentEvent event)
+            {
+                if (event.userDefinedComponentId != Integer.MIN_VALUE)
+                {
+                    System.out.println("Component id " + event.userDefinedComponentId + " deactivated");
+                }
+                else
+                {
+                    System.out.println("unbound component deactivated.");
+                }
+            }
+        };
+
+        ComponentChangeListener changeListener = new ComponentChangeListener(){
+            @Override
+            public void valueChanged(ComponentEvent event)
+            {
+                if (event.userDefinedComponentId == 5 || event.userDefinedComponentId == 6)
+                {
+                    // An axis we identified.
+                    System.out.println("Axis id " + event.userDefinedComponentId + " achieved new value: " + event.currentValue);
+                }
+                else
+                {
+                    System.out.println("Unbound axis " + event.userDefinedComponentId + " achieved new value: " + event.currentValue);
+                }
+            }
+        };
+
+        ComponentPollingListener pollingListener = new ComponentPollingListener(){
+            @Override
+            public void componentPolled(ComponentEvent event)
+            {
+                if (event.userDefinedComponentId == 6)
+                {
+                    System.out.println("Component 6 has value: " + event.currentValue);
+                }
+            }
+        };
+
+        poller.addComponentChangeListener(changeListener);
+        poller.addComponentActivationListener(activationListener);
+        //poller.addComponentPollingListener(pollingListener);
+        poller.startPolling(10, TimeUnit.MILLISECONDS);
+
+        // Wait forever...
+        System.out.println("Waiting for input.");
+        //ControllerManager.shutdown();
     }
 }
