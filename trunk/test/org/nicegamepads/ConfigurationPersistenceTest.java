@@ -73,8 +73,7 @@ public class ConfigurationPersistenceTest
         config = ConfigurationManager.loadConfigurationByType(controller);
         System.out.println(config);
 
-        ControllerPoller poller = new ControllerPoller(controller, true);
-        poller.setConfiguration(config);
+        ControllerPoller poller = new ControllerPoller(config, true);
         
         //final ControllerConfiguration staticConfig = config;
         ComponentActivationListener activationListener =

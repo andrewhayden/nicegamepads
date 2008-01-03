@@ -56,6 +56,22 @@ final class ComponentState
     }
 
     /**
+     * Constructs an independent copy of the specified state.
+     * 
+     * @param source the source to copy from
+     */
+    ComponentState(ComponentState source)
+    {
+        this.component = source.component;
+        this.componentType = source.componentType;
+        this.currentTimestamp = source.currentTimestamp;
+        this.currentValue = source.currentValue;
+        this.lastTimestamp = source.lastTimestamp;
+        this.lastTurboTimerStart = source.lastTurboTimerStart;
+        this.lastValue = source.lastValue;
+    }
+
+    /**
      * Archives the current value and timestamp and sets the new values.
      * 
      * @param value the new value
@@ -106,5 +122,89 @@ final class ComponentState
         buffer.append(lastTurboTimerStart);
         buffer.append("]");
         return buffer.toString();
+    }
+
+    /**
+     * Returns the component to which this state applies.
+     * 
+     * @return the component to which this state applies.
+     */
+    public final Component getComponent()
+    {
+        return component;
+    }
+
+    /**
+     * Returns the type of the component, for convenience.
+     * 
+     * @return the type of the component, for convenience.
+     */
+    public final ComponentType getComponentType()
+    {
+        return componentType;
+    }
+
+    /**
+     * Returns the timestamp at which this state was acquired, in milliseconds
+     * since the epoch.
+     * <p>
+     * If the component has never been polled, the value is -1.
+     * 
+     * @return the timestamp at which this state was acquired, in milliseconds
+     * since the epoch.
+     */
+    public final long getCurrentTimestamp()
+    {
+        return currentTimestamp;
+    }
+
+    /**
+     * Returns the value of the component at the time this state was acquired.
+     * <p>
+     * If the component has never been polled, the value is 0.
+     * 
+     * @return the value of the component at the time this state was acquired.
+     */
+    public final float getCurrentValue()
+    {
+        return currentValue;
+    }
+
+    /**
+     * Returns the timestamp at which the last polling was completed,
+     * in milliseconds since the epoch.
+     * <p>
+     * If the component has never been polled, the value is -1.
+     * 
+     * @return the timestamp at which the last polling was completed,
+     * in milliseconds since the epoch.
+     */
+    public final long getLastTimestamp()
+    {
+        return lastTimestamp;
+    }
+
+    /**
+     * Returns the value of the component at the last polling time.
+     * <p>
+     * If the component has never been polled, the value is zero.
+     * 
+     * @return the value of the component at the last polling time.
+     */
+    public final float getLastValue()
+    {
+        return lastValue;
+    }
+
+    /**
+     * Returns the last time the turbo timer started, if any.
+     * <p>
+     * If the timer has never started, the value is -1.
+     * 
+     * @return the last time the turbo timer started, if any.
+     */
+    public final long getLastTurboTimerStart()
+    {
+        return lastTurboTimerStart;
     }
 }

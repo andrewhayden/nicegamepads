@@ -131,7 +131,7 @@ public class ControllerConfigurator
         }
         eligibleComponents = new HashSet<Component>(
                 ControllerUtils.getComponents(controller, deep));
-        poller = new ControllerPoller(controller, deep);
+        poller = new ControllerPoller(this.config, deep);
     }
 
     /**

@@ -21,11 +21,6 @@ import net.java.games.input.Controller;
 public class ControllerPoller
 {
     /**
-     * The controller to be polled by this object.
-     */
-    private final Controller controller;
-
-    /**
      * The controller state used to store the state of the controller and
      * all of its components.
      */
@@ -57,8 +52,14 @@ public class ControllerPoller
     /**
      * Listeners.
      */
-    private final List<ComponentPollingListener> pollingListeners =
+    private final List<ComponentPollingListener> componentPollingListeners =
         new CopyOnWriteArrayList<ComponentPollingListener>();
+
+    /**
+     * Listeners.
+     */
+    private final List<ControllerPollingListener> controllerPollingListeners =
+        new CopyOnWriteArrayList<ControllerPollingListener>();
 
     /**
      * Used to call the {@link #poll()} method periodically.
@@ -71,25 +72,28 @@ public class ControllerPoller
     private ScheduledFuture<?> pollingTask = null;
 
     /**
-     * Constructs a new poller for the specified controller, optionally
+     * Constructs a new poller for the specified configuration, optionally
      * descending into all subcontrollers.
      * <p>
-     * All of the components found within this controller (and, if requested,
+     * All of the components found within the controller (and, if requested,
      * all of its subcontrollers recursively expanded) can be polled
      * conveniently with this object.
      * 
-     * @param controller the controller to be polled
+     * @param configuration the configuration for the controller to be polled
      * @param deep whether or not to descend recursively into any and all
      * subcontrollers or not
      */
-    public ControllerPoller(Controller controller, boolean deep)
+    public ControllerPoller(ControllerConfiguration configuration, boolean deep)
     {
-        this.controller = controller;
-        this.controllerState = new ControllerState(controller, deep);
+        volatileConfiguration =
+            ConfigurationUtils.immutableControllerConfiguration(configuration);
+        this.controllerState = new ControllerState(
+                volatileConfiguration, deep);
 
         // This call is important!  Don't remove it!
         // It has a side effect
-        ControllerUtils.getComponents(controller, true);
+        ControllerUtils.getComponents(
+                volatileConfiguration.getController(), true);
 
         pollingInvoker = new PollingInvoker(this);
     }
@@ -204,7 +208,7 @@ public class ControllerPoller
      */
     public final Controller getController()
     {
-        return controller;
+        return volatileConfiguration.getController();
     }
 
     /**
@@ -230,10 +234,29 @@ public class ControllerPoller
      * <p>
      * This method is threadsafe.
      * 
-     * @param configuration the configuration to use
+     * @param configuration the configuration to use, which must not
+     * be <code>null</code> and must always refer to the same controller
+     * @throws IllegalArgumentException if the specified configuration is
+     * <code>null</code>
+     * @throws RuntimeException if an attempt is made to set a configuration
+     * that refers to a different controller than the previous configuration
      */
     public final void setConfiguration(ControllerConfiguration configuration)
     {
+        if (configuration == null)
+        {
+            throw new IllegalArgumentException(
+                    "Null configuration specified.");
+        }
+
+        if (configuration.getController() !=
+            volatileConfiguration.getController())
+        {
+            throw new RuntimeException(
+                    "An attempt was made to set a configuration with a "
+                    + "different associated controller");
+        }
+
         // We will store an immutable reference as we should never, EVER
         // change the configuration ourselves.
         this.volatileConfiguration =
@@ -335,9 +358,10 @@ public class ControllerPoller
 
         ComponentConfiguration componentConfig = null;
         final long now = System.currentTimeMillis();
+        controllerState.timestamp = now;
 
         // Poll the controller
-        boolean controllerOk = controller.poll();
+        boolean controllerOk = config.getController().poll();
         if (!controllerOk)
         {
             // FIXME: raise event!
@@ -442,6 +466,17 @@ public class ControllerPoller
 
             // Fire generic polling event
             dispatchComponentPolled(event);
+        }
+
+        // Dispatch controller-polled event.
+        // We check to see if there are any listeners or not as cloning the
+        // controller state can be a relatively expensive operation.  If
+        // nobody is listening, it will be slightly less resource-intensive
+        // to simply skip cloning the state.
+        if (controllerPollingListeners.size() > 0)
+        {
+            ControllerState stateCopy = new ControllerState(controllerState);
+            dispatchControllerPolled(stateCopy);
         }
     }
 
@@ -570,6 +605,18 @@ public class ControllerPoller
     /**
      * Adds a listener to this poller to be notified whenever
      * a component is activated or deactivated.
+     * <p>
+     * It is guaranteed that all component-related events will be
+     * dispatched before any {@link ControllerPollingListener} events.
+     * Thus the caller may safely rely on the {@link ControllerPollingListener}
+     * events as a notification mechanism that all values seen in the
+     * component-related events since the previous controller-polled event
+     * were obtained from one controller polling session.
+     * <p>
+     * Additionally, it is guaranteed that the timestamp on the
+     * {@link ControllerState} object passed to the listener will match
+     * the timestamps on any and all {@link ComponentEvent}s that were
+     * dispatched as part of that same same polling operation.
      * 
      * @param listener the listener to add.
      */
@@ -593,6 +640,18 @@ public class ControllerPoller
     /**
      * Adds a listener to this poller to be notified whenever
      * a component's value changes.
+     * <p>
+     * It is guaranteed that all component-related events will be
+     * dispatched before any {@link ControllerPollingListener} events.
+     * Thus the caller may safely rely on the {@link ControllerPollingListener}
+     * events as a notification mechanism that all values seen in the
+     * component-related events since the previous controller-polled event
+     * were obtained from one controller polling session.
+     * <p>
+     * Additionally, it is guaranteed that the timestamp on the
+     * {@link ControllerState} object passed to the listener will match
+     * the timestamps on any and all {@link ComponentEvent}s that were
+     * dispatched as part of that same same polling operation.
      * 
      * @param listener the listener to add.
      */
@@ -616,13 +675,25 @@ public class ControllerPoller
     /**
      * Adds a listener to this poller to be notified whenever
      * a component is polled.
+     * <p>
+     * It is guaranteed that all component-related events will be
+     * dispatched before any {@link ControllerPollingListener} events.
+     * Thus the caller may safely rely on the {@link ControllerPollingListener}
+     * events as a notification mechanism that all values seen in the
+     * component-related events since the previous controller-polled event
+     * were obtained from one controller polling session.
+     * <p>
+     * Additionally, it is guaranteed that the timestamp on the
+     * {@link ControllerState} object passed to the listener will match
+     * the timestamps on any and all {@link ComponentEvent}s that were
+     * dispatched as part of that same same polling operation.
      * 
      * @param listener the listener to add.
      */
     public final void addComponentPollingListener(
             ComponentPollingListener listener)
     {
-        pollingListeners.add(listener);
+        componentPollingListeners.add(listener);
     }
 
     /**
@@ -633,7 +704,42 @@ public class ControllerPoller
     public final void removeComponentPollingListener(
             ComponentPollingListener listener)
     {
-        pollingListeners.remove(listener);
+        componentPollingListeners.remove(listener);
+    }
+
+    /**
+     * Adds a listener to this poller to be notified whenever
+     * the controller completes polling.
+     * <p>
+     * It is guaranteed that all component-related events will be
+     * dispatched before any {@link ControllerPollingListener} events.
+     * Thus the caller may safely rely on the {@link ControllerPollingListener}
+     * events as a notification mechanism that all values seen in the
+     * component-related events since the previous controller-polled event
+     * were obtained from one controller polling session.
+     * <p>
+     * Additionally, it is guaranteed that the timestamp on the
+     * {@link ControllerState} object passed to the listener will match
+     * the timestamps on any and all {@link ComponentEvent}s that were
+     * dispatched as part of that same same polling operation.
+     * 
+     * @param listener the listener to add.
+     */
+    public final void addControllerPollingListener(
+            ControllerPollingListener listener)
+    {
+        controllerPollingListeners.add(listener);
+    }
+
+    /**
+     * Removes the specified listener.
+     * 
+     * @param listener the listener to be removed
+     */
+    public final void removeControllerPollingListener(
+            ControllerPollingListener listener)
+    {
+        controllerPollingListeners.remove(listener);
     }
 
     /**
@@ -725,9 +831,29 @@ public class ControllerPoller
             @Override
             protected void runInternal()
             {
-                for (ComponentPollingListener listener : pollingListeners)
+                for (ComponentPollingListener listener : componentPollingListeners)
                 {
                     listener.componentPolled(event);
+                }
+            }
+        });
+    }
+
+    /**
+     * Dispatches a new "controller polled" event to all registered
+     * listeners.
+     * 
+     * @param state the state to be dispatched
+     */
+    private final void dispatchControllerPolled(final ControllerState state)
+    {
+        ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
+            @Override
+            protected void runInternal()
+            {
+                for (ControllerPollingListener listener : controllerPollingListeners)
+                {
+                    listener.controllerPolled(state);
                 }
             }
         });
