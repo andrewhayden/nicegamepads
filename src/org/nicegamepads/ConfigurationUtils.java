@@ -604,6 +604,7 @@ final class ConfigurationUtils
                                     source.getSubControllerConfigurations()
                                         .get(subControllers[index])));
             }
+            setSubControllerConfigurations(newSubControllerConfigurations);
         }
 
         /**
