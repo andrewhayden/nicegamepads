@@ -1,6 +1,5 @@
 package org.nicegamepads;
 
-import net.java.games.input.Component;
 
 /**
  * Represents the usual end-user conception of an analog stick by combining
@@ -20,16 +19,16 @@ import net.java.games.input.Component;
  * magnitude does not map quite the same to such a controller; since each stick
  * can move in an unconstrained manner, the maximum magnitude varies
  * as a sinusoidal function of the distance from the center of the individual
- * components - whereas with a circular control, the maximum magnitude is
+ * controls - whereas with a circular control, the maximum magnitude is
  * always 1.0 (that being the radius of the circle in which the control is
  * constrained).
  * <p>
  * Let us consider an example.  If you push the stick straight "south",
- * then the north-south component achieves the value 1.0 and the magnitude
+ * then the north-south control achieves the value 1.0 and the magnitude
  * would be 1.0.  However, if you also push the stick as far "east" as
  * possible, the stick will move to the south-east corner of its range and
- * the east-west component will also achieve the value 1.0.  Since the values
- * of both components are 1.0, the magnitude of the resulting vector is
+ * the east-west control will also achieve the value 1.0.  Since the values
+ * of both controls are 1.0, the magnitude of the resulting vector is
  * <code>Math.sqrt(Math.pow(1,2) + Math.pow(1,2))</code>, which is simply
  * the square root of 2 (~1.414).
  * 
@@ -90,22 +89,22 @@ public class VirtualAnalogStick
     private final PhysicalConstraints constraints;
 
     /**
-     * The horizontal component.
+     * The horizontal control.
      */
-    private final Component eastWestComponent;
+    private final NiceControl eastWestControl;
 
     /**
-     * The vertical component.
+     * The vertical control.
      */
-    private final Component northSouthComponent;
+    private final NiceControl northSouthControl;
 
     /**
-     * The orientation of the horizontal component.
+     * The orientation of the horizontal control.
      */
     private final HorizontalOrientation eastWestOrientation;
 
     /**
-     * The orientation of the vertical component.
+     * The orientation of the vertical control.
      */
     private final VerticalOrientation northSouthOrientation;
 
@@ -114,23 +113,23 @@ public class VirtualAnalogStick
      * 
      * @param constraints the constraints that define what kind of
      * virtual analog stick this is.
-     * @param eastWestComponent the component that provides the east-west
+     * @param eastWestControl the control that provides the east-west
      * portion of the vector
-     * @param northSouthComponent the component that provides the north-south
+     * @param northSouthControl the control that provides the north-south
      * portion of the vector
-     * @param eastWestOrientation the orientation of the east-west component
+     * @param eastWestOrientation the orientation of the east-west control
      * (i.e., which direction is positive and which is negative)
-     * @param northSouthOrientation the orientation of the north-south component
+     * @param northSouthOrientation the orientation of the north-south control
      * (i.e., which direction is positive and which is negative)
      */
     public VirtualAnalogStick(PhysicalConstraints constraints,
-            Component eastWestComponent, Component northSouthComponent,
+            NiceControl eastWestControl, NiceControl northSouthControl,
             HorizontalOrientation eastWestOrientation,
             VerticalOrientation northSouthOrientation)
     {
         this.constraints = constraints;
-        this.eastWestComponent = eastWestComponent;
-        this.northSouthComponent = northSouthComponent;
+        this.eastWestControl = eastWestControl;
+        this.northSouthControl = northSouthControl;
         this.eastWestOrientation = eastWestOrientation;
         this.northSouthOrientation = northSouthOrientation;
     }
@@ -152,22 +151,22 @@ public class VirtualAnalogStick
     {
         return calculate(constraints,
                 eastWestOrientation,
-                state.getComponentState(eastWestComponent).getCurrentValue(),
+                state.getControlState(eastWestControl).getCurrentValue(),
                 northSouthOrientation,
-                state.getComponentState(northSouthComponent).getCurrentValue(),
+                state.getControlState(northSouthControl).getCurrentValue(),
                 result);
     }
 
     /**
      * Processes the specified east-west and north-south values as if they
-     * had been generated from the components associated with this
+     * had been generated from the controls associated with this
      * virtual analog stick and derives a {@link BoundedVector} representing
      * the position of this virtual analog stick.
      * 
      * @param eastWestValue the value to consider as that of the east-west
-     * component
+     * control
      * @param northSouthValue the value to consider as that of the north-south
-     * component
+     * control
      * @param result optionally, a pre-existing result object into which
      * the results are placed and which is subsequently returned;
      * if <code>null</code>, a new {@link BoundedVector} is created
@@ -264,7 +263,7 @@ public class VirtualAnalogStick
         //
         // In the case of a circular constraint, the axes do not truly
         // move independently since east-west motion away from the center
-        // reduces the range of motion of the north-south component (and
+        // reduces the range of motion of the north-south control (and
         // vice-versa).  The sinusoidal nature of these constraints naturally
         // bounds the hypotenuse to the range [0,1], since it is not possible
         // to move the axes in a way such that a^2 + b^2 > 1.

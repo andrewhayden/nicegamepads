@@ -1,10 +1,8 @@
 package org.nicegamepads;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-
-import net.java.games.input.Component;
-import net.java.games.input.Controller;
 
 final class ConfigurationUtils
 {
@@ -28,10 +26,10 @@ final class ConfigurationUtils
      * @param source the configuration to copy
      * @return an independent, read-only copy of the configuration
      */
-    final static ComponentConfiguration immutableComponentConfiguration(
-            ComponentConfiguration source)
+    final static ControlConfiguration immutableComponentConfiguration(
+            ControlConfiguration source)
     {
-        return new ImmutableComponentConfiguration(source);
+        return new ImmutableControlConfiguration(source);
     }
 
     /**
@@ -415,15 +413,15 @@ final class ConfigurationUtils
      * An immutable, and therefore threadsafe, representation of a
      * component configuration.
      */
-    private final static class ImmutableComponentConfiguration
-    extends ComponentConfiguration
+    private final static class ImmutableControlConfiguration
+    extends ControlConfiguration
     {
         /**
          * Constructs an independent deep copy of the specified source object.
          * 
          * @param source the source object to copy from
          */
-        ImmutableComponentConfiguration(ComponentConfiguration source)
+        ImmutableControlConfiguration(ControlConfiguration source)
         {
             super();
             userDefinedId = source.userDefinedId;
@@ -445,7 +443,7 @@ final class ConfigurationUtils
          * 
          * @param source the cource to copy
          */
-        ImmutableComponentConfiguration(ImmutableComponentConfiguration source)
+        ImmutableControlConfiguration(ImmutableControlConfiguration source)
         {
             super();
             userDefinedId = source.userDefinedId;
@@ -461,7 +459,7 @@ final class ConfigurationUtils
         /**
          * For internal use only.
          */
-        private ImmutableComponentConfiguration()
+        private ImmutableControlConfiguration()
         {
             // Nothing
         }
@@ -469,13 +467,13 @@ final class ConfigurationUtils
         /* (non-Javadoc)
          * @see org.nicegamepads.ControllerConfiguration#clone()
          */
-        protected final ComponentConfiguration clone()
+        protected final ControlConfiguration clone()
         throws CloneNotSupportedException
         {
             // Do NOT call super.clone.  This is purposeful!  Super.clone()
             // would create a MUTABLE INSTANCE of this class.
-            ImmutableComponentConfiguration clone =
-                new ImmutableComponentConfiguration();
+            ImmutableControlConfiguration clone =
+                new ImmutableControlConfiguration();
             clone.centerValueOverride = centerValueOverride;
             clone.deadZoneLowerBound = deadZoneLowerBound;
             clone.deadZoneUpperBound = deadZoneUpperBound;
@@ -565,44 +563,42 @@ final class ConfigurationUtils
             // Copy will have blank cache of component locations by controller
             // config.  This is exactly what should happen, since we are creating
             // brand new config objects.
-            Controller controller = source.getController();
+            NiceController controller = source.getController();
 
-            // Generate type code immediately.
+            // Generate fingerprint immediately.
             setController(controller);
-            setControllerTypeCode(ControllerUtils.generateTypeCode(controller));
+            setControllerFingerprint(controller.getFingerprint());
 
             // Fill in config info for components
-            Component[] components = controller.getComponents();
-            int numComponents = (components == null ? 0 : components.length);
-            LinkedHashMap<Component, ComponentConfiguration>
+            List<NiceControl> controls = controller.getControls();
+            LinkedHashMap<NiceControl, ControlConfiguration>
                 newComponentConfigurations =
-                    new LinkedHashMap<Component, ComponentConfiguration>(
-                            numComponents);
-            for (int index=0; index<components.length; index++)
+                    new LinkedHashMap<NiceControl, ControlConfiguration>(
+                            controls.size());
+            for (NiceControl control : controls)
             {
                 newComponentConfigurations.put(
-                        components[index],
-                        new ImmutableComponentConfiguration(
-                                source.getComponentConfigurations().get(
-                                        components[index])));
+                        control,
+                        new ImmutableControlConfiguration(
+                                source.getControlConfigurations().get(
+                                        control)));
             }
-            setComponentConfigurations(newComponentConfigurations);
+            setControlConfigurations(newComponentConfigurations);
 
             // Fill in config info for nested controllers
-            Controller[] subControllers = controller.getControllers();
-            int numSubControllers = (subControllers == null ?
-                    0 : subControllers.length);
-            LinkedHashMap<Controller, ControllerConfiguration>
+            List<NiceController> subControllers = controller.getControllers();
+            int numSubControllers = subControllers.size();
+            LinkedHashMap<NiceController, ControllerConfiguration>
                 newSubControllerConfigurations =
-                    new LinkedHashMap<Controller, ControllerConfiguration>(
+                    new LinkedHashMap<NiceController, ControllerConfiguration>(
                             numSubControllers);
-            for (int index=0; index<subControllers.length; index++)
+            for (int index=0; index<numSubControllers; index++)
             {
                 newSubControllerConfigurations.put(
-                        subControllers[index],
+                        subControllers.get(index),
                             new ImmutableControllerConfiguration(
                                     source.getSubControllerConfigurations()
-                                        .get(subControllers[index])));
+                                        .get(subControllers.get(index))));
             }
             setSubControllerConfigurations(newSubControllerConfigurations);
         }
@@ -615,17 +611,20 @@ final class ConfigurationUtils
          * 
          * @param source the cource to copy
          */
-        ImmutableControllerConfiguration(ImmutableControllerConfiguration source)
+        ImmutableControllerConfiguration(
+                ImmutableControllerConfiguration source)
         {
             // Copy will share the cache of component locations by controller
             // config.  This is exactly what should happen, since we are sharing
             // existing config objects.
-            Controller controller = source.getController();
+            NiceController controller = source.getController();
             setController(controller);
-            setControllerTypeCode(source.getControllerTypeCode());
-            setCachedConfigurationsByComponent(source.getCachedConfigurationsByComponent());
-            setComponentConfigurations(source.getComponentConfigurations());
-            setSubControllerConfigurations(source.getSubControllerConfigurations());
+            setControllerFingerprint(source.getControllerTypeCode());
+            setCachedConfigurationsByControl(
+                    source.getCachedConfigurationsByControl());
+            setControlConfigurations(source.getControlConfigurations());
+            setSubControllerConfigurations(
+                    source.getSubControllerConfigurations());
         }
 
         /**
@@ -647,15 +646,15 @@ final class ConfigurationUtils
             ImmutableControllerConfiguration clone =
                 new ImmutableControllerConfiguration();
             clone.setController(getController());
-            clone.setControllerTypeCode(getControllerTypeCode());
-            clone.setComponentConfigurations(getComponentConfigurations());
+            clone.setControllerFingerprint(getControllerTypeCode());
+            clone.setControlConfigurations(getControlConfigurations());
             clone.setSubControllerConfigurations(getSubControllerConfigurations());
             return clone;
         }
 
         @Override
-        public final void setConfiguration(Component component,
-                ComponentConfiguration configuration)
+        public final void setConfiguration(NiceControl component,
+                ControlConfiguration configuration)
                 throws ConfigurationException
         {
             throw new UnsupportedOperationException(

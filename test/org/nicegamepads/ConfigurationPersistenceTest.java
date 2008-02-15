@@ -7,56 +7,52 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import net.java.games.input.Component;
-import net.java.games.input.Controller;
-
 public class ConfigurationPersistenceTest
 {
     public final static void main(String[] args) throws IOException
     {
         ControllerManager.initialize();
-        List<Controller> gamepads = ControllerUtils.getAllGamepads(false);
+        List<NiceController> gamepads = NiceController.getAllControllers();
 
-        Controller controller = gamepads.get(0);
-        System.out.println("gamepad: " + controller.getName() + "; hash=" + ControllerUtils.generateTypeCode(controller));
-        System.out.println("on port: " + controller.getPortNumber() + " (port type=" + controller.getPortType() + ")");
+        NiceController controller = gamepads.get(0);
+        System.out.println("gamepad: " + controller.getDeclaredName() + "; fingerprint=" + controller.getFingerprint());
 
         ControllerConfiguration config = new ControllerConfiguration(controller);
-        ControllerUtils.setAnalogDeadZones(controller, config, true, -0.1f, 0.1f);
-        ControllerUtils.setAnalogGranularities(controller, config, true, 0.1f);
+        controller.setAnalogDeadZones(-0.1f, 0.1f);
+        controller.setAnalogGranularities(0.1f);
         System.out.println(config);
 
         ControllerConfigurator configurator =
-            new ControllerConfigurator(controller, config, true);
+            new ControllerConfigurator(controller, config);
         
-        ComponentEvent event = null;
-        Set<Component> identifiedComponents = new HashSet<Component>();
+        ControlEvent event = null;
+        Set<NiceControl> identifiedComponents = new HashSet<NiceControl>();
         try
         {
             for (int buttonIndex = 0; buttonIndex < 5; buttonIndex++)
             {
                 System.out.println("Identify a new button...");
-                event = configurator.identifyComponent(ComponentType.BUTTON, identifiedComponents);
+                event = configurator.identifyControl(NiceControlType.DISCRETE_INPUT, identifiedComponents);
                 System.out.println("Component identified: " + event);
-                ComponentConfiguration componentConfig =
-                    config.getConfigurationDeep(event.sourceComponent);
+                ControlConfiguration componentConfig =
+                    config.getConfigurationDeep(event.sourceControl);
                 componentConfig.setValueId(event.previousValue, buttonIndex);
                 componentConfig.setUserDefinedId(buttonIndex);
                 System.out.println("Bound value " + event.previousValue + " to user defined id " + buttonIndex);
-                identifiedComponents.add(event.sourceComponent);
+                identifiedComponents.add(event.sourceControl);
             }
 
             for (int axisIndex = 5; axisIndex < 7; axisIndex++)
             {
                 System.out.println("Identify a new axis...");
-                event = configurator.identifyComponent(ComponentType.AXIS, identifiedComponents);
+                event = configurator.identifyControl(NiceControlType.CONTINUOUS_INPUT, identifiedComponents);
                 System.out.println("Component identified: " + event);
-                ComponentConfiguration componentConfig =
-                    config.getConfigurationDeep(event.sourceComponent);
+                ControlConfiguration componentConfig =
+                    config.getConfigurationDeep(event.sourceControl);
                 componentConfig.setValueId(event.previousValue, axisIndex);
                 componentConfig.setUserDefinedId(axisIndex);
                 System.out.println("Bound value " + event.previousValue + " to user defined id " + axisIndex);
-                identifiedComponents.add(event.sourceComponent);
+                identifiedComponents.add(event.sourceControl);
             }
         }
         catch (InterruptedException e)
@@ -73,18 +69,18 @@ public class ConfigurationPersistenceTest
         config = ConfigurationManager.loadConfigurationByType(controller);
         System.out.println(config);
 
-        ControllerPoller poller = new ControllerPoller(config, true);
+        ControllerPoller poller = new ControllerPoller(config);
         
         //final ControllerConfiguration staticConfig = config;
-        ComponentActivationListener activationListener =
-            new ComponentActivationListener(){
+        ControlActivationListener activationListener =
+            new ControlActivationListener(){
 
             @Override
-            public void componentActivated(ComponentEvent event)
+            public void controlActivated(ControlEvent event)
             {
-                if (event.userDefinedComponentId != Integer.MIN_VALUE)
+                if (event.userDefinedControlId != Integer.MIN_VALUE)
                 {
-                    System.out.println("Component id " + event.userDefinedComponentId + " activated");
+                    System.out.println("Component id " + event.userDefinedControlId + " activated");
                 }
                 else
                 {
@@ -93,11 +89,11 @@ public class ConfigurationPersistenceTest
             }
 
             @Override
-            public void componentDeactivated(ComponentEvent event)
+            public void controlDeactivated(ControlEvent event)
             {
-                if (event.userDefinedComponentId != Integer.MIN_VALUE)
+                if (event.userDefinedControlId != Integer.MIN_VALUE)
                 {
-                    System.out.println("Component id " + event.userDefinedComponentId + " deactivated");
+                    System.out.println("Component id " + event.userDefinedControlId + " deactivated");
                 }
                 else
                 {
@@ -106,35 +102,35 @@ public class ConfigurationPersistenceTest
             }
         };
 
-        ComponentChangeListener changeListener = new ComponentChangeListener(){
+        ControlChangeListener changeListener = new ControlChangeListener(){
             @Override
-            public void valueChanged(ComponentEvent event)
+            public void valueChanged(ControlEvent event)
             {
-                if (event.userDefinedComponentId == 5 || event.userDefinedComponentId == 6)
+                if (event.userDefinedControlId == 5 || event.userDefinedControlId == 6)
                 {
                     // An axis we identified.
-                    System.out.println("Axis id " + event.userDefinedComponentId + " achieved new value: " + event.currentValue);
+                    System.out.println("Axis id " + event.userDefinedControlId + " achieved new value: " + event.currentValue);
                 }
                 else
                 {
-                    System.out.println("Unbound axis " + event.userDefinedComponentId + " achieved new value: " + event.currentValue);
+                    System.out.println("Unbound axis " + event.userDefinedControlId + " achieved new value: " + event.currentValue);
                 }
             }
         };
 
-        ComponentPollingListener pollingListener = new ComponentPollingListener(){
+        ControlPollingListener pollingListener = new ControlPollingListener(){
             @Override
-            public void componentPolled(ComponentEvent event)
+            public void controlPolled(ControlEvent event)
             {
-                if (event.userDefinedComponentId == 6)
+                if (event.userDefinedControlId == 6)
                 {
                     System.out.println("Component 6 has value: " + event.currentValue);
                 }
             }
         };
 
-        poller.addComponentChangeListener(changeListener);
-        poller.addComponentActivationListener(activationListener);
+        poller.addControlChangeListener(changeListener);
+        poller.addControlActivationListener(activationListener);
         //poller.addComponentPollingListener(pollingListener);
         poller.startPolling(10, TimeUnit.MILLISECONDS);
 

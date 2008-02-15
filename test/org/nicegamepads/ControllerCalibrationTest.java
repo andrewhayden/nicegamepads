@@ -4,49 +4,45 @@ import java.util.List;
 
 import org.nicegamepads.CalibrationResults.Range;
 
-import net.java.games.input.Component;
-import net.java.games.input.Controller;
-
 public class ControllerCalibrationTest
 {
     public final static void main(String[] args)
     {
         ControllerManager.initialize();
-        List<Controller> gamepads = ControllerUtils.getAllGamepads(false);
-        for (Controller c : gamepads)
+        List<NiceController> gamepads = NiceController.getAllControllers();
+        for (NiceController controller : gamepads)
         {
-            System.out.println("gamepad: " + c.getName() + "; hash=" + ControllerUtils.generateTypeCode(c));
-            System.out.println("on port: " + c.getPortNumber() + " (port type=" + c.getPortType() + ")");
+            System.out.println("gamepad: " + controller.getDeclaredName() + "; fingerprint=" + controller.getFingerprint());
         }
 
-        Controller controller = gamepads.get(0);
+        NiceController controller = gamepads.get(0);
         ControllerConfiguration config = new ControllerConfiguration(controller);
-        ControllerUtils.loadDeadZoneDefaults(controller, config, true);
+        controller.loadDeadZoneDefaults();
         System.out.println(config);
         ControllerConfigurator configurator =
-            new ControllerConfigurator(controller, config, true);
+            new ControllerConfigurator(controller, config);
 
         configurator.addCalibrationListener(new CalibrationListener(){
 
             @Override
-            public void calibrationResultsUpdated(Controller controller,
-                    Component component, Range range)
+            public void calibrationResultsUpdated(NiceController controller,
+                    NiceControl control, Range range)
             {
                 System.out.println("Calibration updated for controller \""
-                        + controller + "\", component \""
-                        + component.getName() + "\": "
+                        + controller + "\", control \""
+                        + control.getDeclaredName() + "\": "
                         + range);
             }
 
             @Override
-            public void calibrationStarted(Controller controller)
+            public void calibrationStarted(NiceController controller)
             {
                 System.out.println("Calibration started for controller \""
                         + controller + "\"");
             }
 
             @Override
-            public void calibrationStopped(Controller controller,
+            public void calibrationStopped(NiceController controller,
                     CalibrationResults results)
             {
                 System.out.println("Calibration complete for controller \""

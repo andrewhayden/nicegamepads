@@ -1,43 +1,34 @@
 package org.nicegamepads;
 
-import net.java.games.input.Component;
-import net.java.games.input.Controller;
-
 /**
- * Encapsulates information about an event from a component.
+ * Encapsulates information about an event from a control.
  * 
  * @author Andrew Hayden
  */
-public class ComponentEvent
+public class ControlEvent
 {
     /**
-     * The parent controller in which the source component resides, if
+     * The parent controller in which the source control resides, if
      * known; otherwise, <code>null</code>.
      * <p>
      * If set, this is always the immediate parent controller of the
-     * component.
+     * control.
      */
-    public final Controller sourceController;
+    public final NiceController sourceController;
 
     /**
-     * The component that generated the event.
+     * The control that generated the event.
      */
-    public final Component sourceComponent;
+    public final NiceControl sourceControl;
 
     /**
-     * The type of the source component, if the source component is
-     * not <code>null</code>.
-     */
-    public final ComponentType sourceComponentType;
-
-    /**
-     * The user-defined ID for the source component, if any; otherwise,
+     * The user-defined ID for the source control, if any; otherwise,
      * {@link Integer#MIN_VALUE}.
      */
-    public final int userDefinedComponentId;
+    public final int userDefinedControlId;
 
     /**
-     * The current value of the component at the time this event was fired,
+     * The current value of the control at the time this event was fired,
      * or {@link Float#NaN} if there is no applicable value.
      */
     public final float currentValue;
@@ -49,7 +40,7 @@ public class ComponentEvent
     public final int currentValueId;
 
     /**
-     * The value of the component at the previous time the source component,
+     * The value of the control at the previous time the source control,
      * was polled, or {@link Float#NaN} if there is no applicable value.
      */
     public final float previousValue;
@@ -61,55 +52,43 @@ public class ComponentEvent
     public final int previousValueId;
 
     /**
-     * Constructs a new component event.
+     * Constructs a new control event.
      * 
      * @param topLevelSourceController
-     * @param sourceComponent
-     * @param userDefinedComponentId
+     * @param sourceControl
+     * @param userDefinedControlId
      * @param currentValue
      * @param currentValueId
      * @param previousValue
      * @param previousValueId
      */
-    public ComponentEvent(Controller topLevelSourceController,
-            Component sourceComponent, int userDefinedComponentId,
+    public ControlEvent(NiceController topLevelSourceController,
+            NiceControl sourceControl, int userDefinedNiceControlId,
             float currentValue, int currentValueId, float previousValue,
             int previousValueId)
     {
         super();
         this.sourceController = topLevelSourceController;
-        this.sourceComponent = sourceComponent;
-        this.userDefinedComponentId = userDefinedComponentId;
+        this.sourceControl = sourceControl;
+        this.userDefinedControlId = userDefinedNiceControlId;
         this.currentValue = currentValue;
         this.currentValueId = currentValueId;
         this.previousValue = previousValue;
         this.previousValueId = previousValueId;
-
-        if (sourceComponent != null)
-        {
-            this.sourceComponentType =
-                ControllerUtils.getComponentType(sourceComponent);
-        }
-        else
-        {
-            this.sourceComponentType = null;
-        }
     }
 
     @Override
     public String toString()
     {
         StringBuilder buffer = new StringBuilder();
-        buffer.append(ComponentEvent.class.getName());
+        buffer.append(ControlEvent.class.getName());
         buffer.append(": [");
         buffer.append("sourceController=");
         buffer.append(sourceController);
-        buffer.append(", sourceComponent=");
-        buffer.append(sourceComponent);
-        buffer.append(", sourceComponentType=");
-        buffer.append(sourceComponentType);
-        buffer.append(", userDefinedComponentId=");
-        buffer.append(userDefinedComponentId);
+        buffer.append(", sourceNiceControl=");
+        buffer.append(sourceControl);
+        buffer.append(", userDefinedControlId=");
+        buffer.append(userDefinedControlId);
         buffer.append(", previousValue=");
         buffer.append(previousValue);
         buffer.append(", previousValueId=");

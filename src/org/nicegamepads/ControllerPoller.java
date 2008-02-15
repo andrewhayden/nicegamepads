@@ -11,8 +11,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import net.java.games.input.Controller;
-
 /**
  * Abstracts the polling of a single processor.
  * 
@@ -22,7 +20,7 @@ public class ControllerPoller
 {
     /**
      * The controller state used to store the state of the controller and
-     * all of its components.
+     * all of its controls.
      */
     private final ControllerState controllerState;
 
@@ -40,20 +38,20 @@ public class ControllerPoller
     /**
      * Listeners.
      */
-    private final List<ComponentActivationListener> activationListeners =
-        new CopyOnWriteArrayList<ComponentActivationListener>();
+    private final List<ControlActivationListener> activationListeners =
+        new CopyOnWriteArrayList<ControlActivationListener>();
 
     /**
      * Listeners.
      */
-    private final List<ComponentChangeListener> changeListeners =
-        new CopyOnWriteArrayList<ComponentChangeListener>();
+    private final List<ControlChangeListener> changeListeners =
+        new CopyOnWriteArrayList<ControlChangeListener>();
 
     /**
      * Listeners.
      */
-    private final List<ComponentPollingListener> componentPollingListeners =
-        new CopyOnWriteArrayList<ComponentPollingListener>();
+    private final List<ControlPollingListener> controlPollingListeners =
+        new CopyOnWriteArrayList<ControlPollingListener>();
 
     /**
      * Listeners.
@@ -75,7 +73,7 @@ public class ControllerPoller
      * Constructs a new poller for the specified configuration, optionally
      * descending into all subcontrollers.
      * <p>
-     * All of the components found within the controller (and, if requested,
+     * All of the controls found within the controller (and, if requested,
      * all of its subcontrollers recursively expanded) can be polled
      * conveniently with this object.
      * 
@@ -83,18 +81,11 @@ public class ControllerPoller
      * @param deep whether or not to descend recursively into any and all
      * subcontrollers or not
      */
-    public ControllerPoller(ControllerConfiguration configuration, boolean deep)
+    public ControllerPoller(ControllerConfiguration configuration)
     {
         volatileConfiguration =
             ConfigurationUtils.immutableControllerConfiguration(configuration);
-        this.controllerState = new ControllerState(
-                volatileConfiguration, deep);
-
-        // This call is important!  Don't remove it!
-        // It has a side effect
-        ControllerUtils.getComponents(
-                volatileConfiguration.getController(), true);
-
+        this.controllerState = new ControllerState(volatileConfiguration);
         pollingInvoker = new PollingInvoker(this);
     }
 
@@ -206,7 +197,7 @@ public class ControllerPoller
      * 
      * @return the controller that this poller polls for
      */
-    public final Controller getController()
+    public final NiceController getController()
     {
         return volatileConfiguration.getController();
     }
@@ -337,9 +328,9 @@ public class ControllerPoller
     }
 
     /**
-     * Forces this controller to poll all of its components immediately.
+     * Forces this controller to poll all of its controls immediately.
      * <p>
-     * Polling will dispatch events for the components as necessary.
+     * Polling will dispatch events for the controls as necessary.
      * 
      * @throws IllegalStateException if no configuration has been set for
      * this poller
@@ -356,7 +347,7 @@ public class ControllerPoller
             throw new IllegalStateException("Null configuration.");
         }
 
-        ComponentConfiguration componentConfig = null;
+        ControlConfiguration controlConfig = null;
         final long now = System.currentTimeMillis();
         controllerState.timestamp = now;
 
@@ -368,27 +359,27 @@ public class ControllerPoller
             stopPolling();
         }
 
-        // Process each component.
-        for (ComponentState state : controllerState.componentStates)
+        // Process each control.
+        for (ControlState state : controllerState.controlStates)
         {
-            // Look up configuration for this component
-            componentConfig = config.getConfigurationDeep(state.component);
+            // Look up configuration for this control
+            controlConfig = config.getConfigurationDeep(state.control);
             // Poll the value
-            float polledValue = state.component.getPollData();
+            float polledValue = state.control.getPollData();
             // Transform according to configuration rules
-            polledValue = transform(polledValue, componentConfig, state.componentType);
+            polledValue = transform(
+                    polledValue, controlConfig, state.control.controlType);
             // Get any user ID bound to this value
             boolean forceFireTurboEvent = false;
 
-            switch (state.componentType)
+            switch (state.control.controlType)
             {
-                case BUTTON:
-                case KEY:
+                case DISCRETE_INPUT:
                     state.newValue(polledValue, now, polledValue == 1f);
                     // Check for turbo stuff
-                    if (componentConfig.isTurboEnabled && polledValue == 1f)
+                    if (controlConfig.isTurboEnabled && polledValue == 1f)
                     {
-                        if (componentConfig.turboDelayMillis == 0)
+                        if (controlConfig.turboDelayMillis == 0)
                         {
                             // If button is pressed, force an event.
                             forceFireTurboEvent = true;
@@ -398,7 +389,7 @@ public class ControllerPoller
                             // There is a specific delay for turbo and the
                             // timer is running.  Has enough time gone by?
                             if (now - state.lastTurboTimerStart >=
-                                componentConfig.turboDelayMillis)
+                                controlConfig.turboDelayMillis)
                             {
                                 // Yes.
                                 forceFireTurboEvent = true;
@@ -406,15 +397,15 @@ public class ControllerPoller
                         }
                     }
                     break;
-                case AXIS:
+                case CONTINUOUS_INPUT:
                     state.newValue(polledValue, now, false);
                     break;
                 default:
-                    throw new RuntimeException(
-                            "Unsupported component type: " + state.componentType);
+                    throw new RuntimeException("Unsupported control type: "
+                            + state.control.controlType);
             }
 
-            ComponentEvent event = makeEvent(state, componentConfig);
+            ControlEvent event = makeEvent(state, controlConfig);
             // Figure out which events need to be fired.
 
             // Start with activation/deactivation events:
@@ -425,9 +416,9 @@ public class ControllerPoller
                 if (event.previousValueId != event.currentValueId)
                 {
                     // Previous id deactivated.
-                    dispatchComponentDeactivated(event);
+                    dispatchControlDeactivated(event);
                     // Current id activated
-                    dispatchComponentActivated(event);
+                    dispatchControlActivated(event);
                 }
                 else
                 {
@@ -436,19 +427,19 @@ public class ControllerPoller
                     {
                         // Turbo mode engaged.  Force an event to fire even
                         // though nothing has really changed.
-                        dispatchComponentActivated(event);
+                        dispatchControlActivated(event);
                     }
                 }
             }
             else if (event.previousValueId != Integer.MIN_VALUE)
             {
                 // Previous value is bound but current value isn't.
-                dispatchComponentDeactivated(event);
+                dispatchControlDeactivated(event);
             }
             else if (event.currentValueId != Integer.MIN_VALUE)
             {
                 // Current value is bound but previous value isn't.
-                dispatchComponentActivated(event);
+                dispatchControlActivated(event);
             }
             else
             {
@@ -465,7 +456,7 @@ public class ControllerPoller
             }
 
             // Fire generic polling event
-            dispatchComponentPolled(event);
+            dispatchControlPolled(event);
         }
 
         // Dispatch controller-polled event.
@@ -484,19 +475,19 @@ public class ControllerPoller
      * Applies any and all transforms to the polled value, as defined by
      * the configuration, and returns the result.
      * 
-     * @param polledValue the value that was polled from the component
-     * @param componentConfig the component configuration to consult
-     * @param the type of component
+     * @param polledValue the value that was polled from the control
+     * @param controlConfig the control configuration to consult
+     * @param the type of control
      * @return the post-transform result for the value
      */
     private final float transform(float polledValue,
-            ComponentConfiguration componentConfig, ComponentType componentType)
+            ControlConfiguration controlConfig, NiceControlType controlType)
     {
         // STEP 1: Granularity
         // Get granularity bins and collapse.
-        if (!Float.isNaN(componentConfig.granularity))
+        if (!Float.isNaN(controlConfig.granularity))
         {
-            float[] bins = getGranularityBins(componentConfig.granularity);
+            float[] bins = getGranularityBins(controlConfig.granularity);
             int index = Arrays.binarySearch(bins, polledValue);
             if (index < 0)
             {
@@ -521,11 +512,11 @@ public class ControllerPoller
         }
 
         // STEP 2: Dead zone
-        if (!Float.isNaN(componentConfig.deadZoneLowerBound))
+        if (!Float.isNaN(controlConfig.deadZoneLowerBound))
         {
             // We have a dead zone to consider.
-            if (componentConfig.deadZoneLowerBound <= polledValue
-                    && polledValue <= componentConfig.deadZoneUpperBound)
+            if (controlConfig.deadZoneLowerBound <= polledValue
+                    && polledValue <= controlConfig.deadZoneUpperBound)
             {
                 // Value is in the dead zone.  Set to zero.
                 polledValue = 0f;
@@ -533,10 +524,14 @@ public class ControllerPoller
         }
 
         // STEP 3: Inversion
-        if (componentConfig.isInverted)
+        if (controlConfig.isInverted)
         {
-            if (componentType == ComponentType.BUTTON)
+            if (controlType == NiceControlType.DISCRETE_INPUT)
             {
+                // FIXME: need to correct this behavior.
+                // Buttons should be treated specially... this was originally
+                // for buttons when buttons existed as a type
+
                 // Reflect around 0.5f
                 polledValue = 1f - polledValue;
             }
@@ -548,40 +543,33 @@ public class ControllerPoller
         }
 
         // STEP 4: Recentering
-        if (!Float.isNaN(componentConfig.centerValueOverride)
-                && componentConfig.centerValueOverride != 0f)
+        if (!Float.isNaN(controlConfig.centerValueOverride)
+                && controlConfig.centerValueOverride != 0f)
         {
             float positiveExpansion;
             float negativeExpansion;
-            if (componentType == ComponentType.BUTTON)
+            if (controlConfig.centerValueOverride > 0f)
             {
-                
+                positiveExpansion = 1f - controlConfig.centerValueOverride;
+                negativeExpansion = 1f + controlConfig.centerValueOverride;
             }
             else
             {
-                if (componentConfig.centerValueOverride > 0)
-                {
-                    positiveExpansion = 1f - componentConfig.centerValueOverride;
-                    negativeExpansion = 1f + componentConfig.centerValueOverride;
-                }
-                else
-                {
-                    negativeExpansion = 1f - Math.abs(componentConfig.centerValueOverride);
-                    positiveExpansion = 1f - componentConfig.centerValueOverride;
-                }
+                negativeExpansion = 1f - Math.abs(controlConfig.centerValueOverride);
+                positiveExpansion = 1f - controlConfig.centerValueOverride;
+            }
 
-                if (polledValue > 0)
-                {
-                    polledValue *= positiveExpansion;
-                }
-                else if (polledValue < 0)
-                {
-                    polledValue *= negativeExpansion;
-                }
-                else
-                {
-                    polledValue = componentConfig.centerValueOverride;
-                }
+            if (polledValue > 0)
+            {
+                polledValue *= positiveExpansion;
+            }
+            else if (polledValue < 0)
+            {
+                polledValue *= negativeExpansion;
+            }
+            else
+            {
+                polledValue = controlConfig.centerValueOverride;
             }
         }
 
@@ -604,24 +592,24 @@ public class ControllerPoller
 
     /**
      * Adds a listener to this poller to be notified whenever
-     * a component is activated or deactivated.
+     * a control is activated or deactivated.
      * <p>
-     * It is guaranteed that all component-related events will be
+     * It is guaranteed that all control-related events will be
      * dispatched before any {@link ControllerPollingListener} events.
      * Thus the caller may safely rely on the {@link ControllerPollingListener}
      * events as a notification mechanism that all values seen in the
-     * component-related events since the previous controller-polled event
+     * control-related events since the previous controller-polled event
      * were obtained from one controller polling session.
      * <p>
      * Additionally, it is guaranteed that the timestamp on the
      * {@link ControllerState} object passed to the listener will match
-     * the timestamps on any and all {@link ComponentEvent}s that were
+     * the timestamps on any and all {@link ControlEvent}s that were
      * dispatched as part of that same same polling operation.
      * 
      * @param listener the listener to add.
      */
-    public final void addComponentActivationListener(
-            ComponentActivationListener listener)
+    public final void addControlActivationListener(
+            ControlActivationListener listener)
     {
         activationListeners.add(listener);
     }
@@ -631,32 +619,32 @@ public class ControllerPoller
      * 
      * @param listener the listener to be removed
      */
-    public final void removeComponentActivationListener(
-            ComponentActivationListener listener)
+    public final void removeControlActivationListener(
+            ControlActivationListener listener)
     {
         activationListeners.remove(listener);
     }
 
     /**
      * Adds a listener to this poller to be notified whenever
-     * a component's value changes.
+     * a control's value changes.
      * <p>
-     * It is guaranteed that all component-related events will be
+     * It is guaranteed that all control-related events will be
      * dispatched before any {@link ControllerPollingListener} events.
      * Thus the caller may safely rely on the {@link ControllerPollingListener}
      * events as a notification mechanism that all values seen in the
-     * component-related events since the previous controller-polled event
+     * control-related events since the previous controller-polled event
      * were obtained from one controller polling session.
      * <p>
      * Additionally, it is guaranteed that the timestamp on the
      * {@link ControllerState} object passed to the listener will match
-     * the timestamps on any and all {@link ComponentEvent}s that were
+     * the timestamps on any and all {@link ControlEvent}s that were
      * dispatched as part of that same same polling operation.
      * 
      * @param listener the listener to add.
      */
-    public final void addComponentChangeListener(
-            ComponentChangeListener listener)
+    public final void addControlChangeListener(
+            ControlChangeListener listener)
     {
         changeListeners.add(listener);
     }
@@ -666,34 +654,34 @@ public class ControllerPoller
      * 
      * @param listener the listener to be removed
      */
-    public final void removeComponentChangeListener(
-            ComponentChangeListener listener)
+    public final void removeControlChangeListener(
+            ControlChangeListener listener)
     {
         changeListeners.remove(listener);
     }
 
     /**
      * Adds a listener to this poller to be notified whenever
-     * a component is polled.
+     * a control is polled.
      * <p>
-     * It is guaranteed that all component-related events will be
+     * It is guaranteed that all control-related events will be
      * dispatched before any {@link ControllerPollingListener} events.
      * Thus the caller may safely rely on the {@link ControllerPollingListener}
      * events as a notification mechanism that all values seen in the
-     * component-related events since the previous controller-polled event
+     * control-related events since the previous controller-polled event
      * were obtained from one controller polling session.
      * <p>
      * Additionally, it is guaranteed that the timestamp on the
      * {@link ControllerState} object passed to the listener will match
-     * the timestamps on any and all {@link ComponentEvent}s that were
+     * the timestamps on any and all {@link ControlEvent}s that were
      * dispatched as part of that same same polling operation.
      * 
      * @param listener the listener to add.
      */
-    public final void addComponentPollingListener(
-            ComponentPollingListener listener)
+    public final void addControlPollingListener(
+            ControlPollingListener listener)
     {
-        componentPollingListeners.add(listener);
+        controlPollingListeners.add(listener);
     }
 
     /**
@@ -701,26 +689,26 @@ public class ControllerPoller
      * 
      * @param listener the listener to be removed
      */
-    public final void removeComponentPollingListener(
-            ComponentPollingListener listener)
+    public final void removeControlPollingListener(
+            ControlPollingListener listener)
     {
-        componentPollingListeners.remove(listener);
+        controlPollingListeners.remove(listener);
     }
 
     /**
      * Adds a listener to this poller to be notified whenever
      * the controller completes polling.
      * <p>
-     * It is guaranteed that all component-related events will be
+     * It is guaranteed that all control-related events will be
      * dispatched before any {@link ControllerPollingListener} events.
      * Thus the caller may safely rely on the {@link ControllerPollingListener}
      * events as a notification mechanism that all values seen in the
-     * component-related events since the previous controller-polled event
+     * control-related events since the previous controller-polled event
      * were obtained from one controller polling session.
      * <p>
      * Additionally, it is guaranteed that the timestamp on the
      * {@link ControllerState} object passed to the listener will match
-     * the timestamps on any and all {@link ComponentEvent}s that were
+     * the timestamps on any and all {@link ControlEvent}s that were
      * dispatched as part of that same same polling operation.
      * 
      * @param listener the listener to add.
@@ -746,54 +734,54 @@ public class ControllerPoller
      * Makes an event from the specified state and configuration.
      * 
      * @param state the state to base the event on
-     * @param config the config associated with the component
+     * @param config the config associated with the control
      * @return the event
      */
-    private final static ComponentEvent makeEvent(
-            ComponentState state, ComponentConfiguration config)
+    private final static ControlEvent makeEvent(
+            ControlState state, ControlConfiguration config)
     {
-        return new ComponentEvent(
-                ControllerUtils.getCachedParentController(state.component),
-                state.component, config.getUserDefinedId(),
+        return new ControlEvent(
+                state.control.owner,
+                state.control, config.getUserDefinedId(),
                 state.currentValue, config.getValueId(state.currentValue),
                 state.lastValue, config.getValueId(state.lastValue));
     }
 
     /**
-     * Dispatches a new "component activated" event to all registered
+     * Dispatches a new "control activated" event to all registered
      * listeners.
      * 
      * @param event the event to be dispatched
      */
-    private final void dispatchComponentActivated(final ComponentEvent event)
+    private final void dispatchControlActivated(final ControlEvent event)
     {
         ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
             @Override
             protected void runInternal()
             {
-                for (ComponentActivationListener listener : activationListeners)
+                for (ControlActivationListener listener : activationListeners)
                 {
-                    listener.componentActivated(event);
+                    listener.controlActivated(event);
                 }
             }
         });
     }
 
     /**
-     * Dispatches a new "component deactivated" event to all registered
+     * Dispatches a new "control deactivated" event to all registered
      * listeners.
      * 
      * @param event the event to be dispatched
      */
-    private final void dispatchComponentDeactivated(final ComponentEvent event)
+    private final void dispatchControlDeactivated(final ControlEvent event)
     {
         ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
             @Override
             protected void runInternal()
             {
-                for (ComponentActivationListener listener : activationListeners)
+                for (ControlActivationListener listener : activationListeners)
                 {
-                    listener.componentDeactivated(event);
+                    listener.controlDeactivated(event);
                 }
             }
         });
@@ -805,13 +793,13 @@ public class ControllerPoller
      * 
      * @param event the event to be dispatched
      */
-    private final void dispatchValueChanged(final ComponentEvent event)
+    private final void dispatchValueChanged(final ControlEvent event)
     {
         ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
             @Override
             protected void runInternal()
             {
-                for (ComponentChangeListener listener : changeListeners)
+                for (ControlChangeListener listener : changeListeners)
                 {
                     listener.valueChanged(event);
                 }
@@ -820,20 +808,20 @@ public class ControllerPoller
     }
 
     /**
-     * Dispatches a new "component polled" event to all registered
+     * Dispatches a new "control polled" event to all registered
      * listeners.
      * 
      * @param event the event to be dispatched
      */
-    private final void dispatchComponentPolled(final ComponentEvent event)
+    private final void dispatchControlPolled(final ControlEvent event)
     {
         ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
             @Override
             protected void runInternal()
             {
-                for (ComponentPollingListener listener : componentPollingListeners)
+                for (ControlPollingListener listener : controlPollingListeners)
                 {
-                    listener.componentPolled(event);
+                    listener.controlPolled(event);
                 }
             }
         });

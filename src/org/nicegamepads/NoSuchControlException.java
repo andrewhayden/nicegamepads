@@ -2,16 +2,16 @@ package org.nicegamepads;
 
 /**
  * Represents an error condition where there is an attempt to access a
- * component that does not exist.
+ * control that does not exist.
  * 
  * @author Andrew Hayden
  */
-public class NoSuchComponentException extends RuntimeException
+public class NoSuchControlException extends RuntimeException
 {
     /**
      * Constructs a new exception.
      */
-    public NoSuchComponentException()
+    public NoSuchControlException()
     {
         super();
     }
@@ -20,7 +20,7 @@ public class NoSuchComponentException extends RuntimeException
      * @param message
      * @param cause
      */
-    public NoSuchComponentException(String message, Throwable cause)
+    public NoSuchControlException(String message, Throwable cause)
     {
         super(message, cause);
     }
@@ -28,7 +28,7 @@ public class NoSuchComponentException extends RuntimeException
     /**
      * @param message
      */
-    public NoSuchComponentException(String message)
+    public NoSuchControlException(String message)
     {
         super(message);
     }
@@ -36,7 +36,7 @@ public class NoSuchComponentException extends RuntimeException
     /**
      * @param cause
      */
-    public NoSuchComponentException(Throwable cause)
+    public NoSuchControlException(Throwable cause)
     {
         super(cause);
     }

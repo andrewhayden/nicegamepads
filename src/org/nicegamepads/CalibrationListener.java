@@ -1,8 +1,5 @@
 package org.nicegamepads;
 
-import net.java.games.input.Component;
-import net.java.games.input.Controller;
-
 /**
  * Interface for entities wishing to be notified about calibration events.
  * 
@@ -15,7 +12,7 @@ public interface CalibrationListener
      * 
      * @param controller the controller being calibrated
      */
-    public abstract void calibrationStarted(Controller controller);
+    public abstract void calibrationStarted(NiceController controller);
 
     /**
      * Invoked when calibration is stopped.
@@ -23,16 +20,17 @@ public interface CalibrationListener
      * @param controller the controller being calibrated
      * @param results the current results
      */
-    public abstract void calibrationStopped(Controller controller, CalibrationResults results);
+    public abstract void calibrationStopped(NiceController controller,
+            CalibrationResults results);
 
     /**
      * Invoked when calibration results are updated.  Results are updated
-     * in near-realtime as new values are discovered from a component.
+     * in near-realtime as new values are discovered from a control.
      * 
      * @param controller the controller being calibrated
-     * @param component the component whose range has been updated
+     * @param control the control whose range has been updated
      * @param range the new range
      */
-    public abstract void calibrationResultsUpdated(Controller controller,
-            Component component, CalibrationResults.Range range);
+    public abstract void calibrationResultsUpdated(NiceController controller,
+            NiceControl control, CalibrationResults.Range range);
 }

@@ -80,7 +80,7 @@ import java.util.TreeSet;
  * 
  * @author Andrew Hayden
  */
-public class ComponentConfiguration implements Cloneable
+public class ControlConfiguration implements Cloneable
 {
     /**
      * The lower bound of the dead zone, if any (inclusive).
@@ -133,7 +133,7 @@ public class ComponentConfiguration implements Cloneable
     /**
      * Creates a new, empty configuration with default values.
      */
-    ComponentConfiguration()
+    ControlConfiguration()
     {
         valueIdsByValue = new HashMap<Float, Integer>();
     }
@@ -144,7 +144,7 @@ public class ComponentConfiguration implements Cloneable
      * This is a safe alternative to calling {@link #clone()}, which may
      * be overridden by subclasses.
      */
-    ComponentConfiguration(ComponentConfiguration source)
+    ControlConfiguration(ControlConfiguration source)
     {
         userDefinedId = source.userDefinedId;
         deadZoneLowerBound = source.deadZoneLowerBound;
@@ -160,11 +160,11 @@ public class ComponentConfiguration implements Cloneable
      * @see java.lang.Object#clone()
      */
     @Override
-    protected ComponentConfiguration clone()
+    protected ControlConfiguration clone()
     throws CloneNotSupportedException
     {
         super.clone();
-        ComponentConfiguration clone = new ComponentConfiguration();
+        ControlConfiguration clone = new ControlConfiguration();
         clone.userDefinedId = userDefinedId;
         clone.deadZoneLowerBound = deadZoneLowerBound;
         clone.deadZoneUpperBound = deadZoneUpperBound;
@@ -854,7 +854,7 @@ public class ComponentConfiguration implements Cloneable
     public String toString()
     {
         StringBuilder buffer = new StringBuilder();
-        buffer.append(ComponentConfiguration.class.getName());
+        buffer.append(ControlConfiguration.class.getName());
         buffer.append(": [");
         buffer.append("userDefinedId=");
         buffer.append(userDefinedId);

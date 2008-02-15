@@ -7,9 +7,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import net.java.games.input.Component;
-import net.java.games.input.Controller;
-
 /**
  * Encapsulates the results of a calibration operation.
  * <p>
@@ -81,23 +78,23 @@ public final class CalibrationResults
     }
 
     /**
-     * All ranges by component.
+     * All ranges by control.
      */
-    private final Map<Component, Range> rangesByComponent;
+    private final Map<NiceControl, Range> rangesByControl;
 
     /**
      * The controller being calibrated.
      */
-    private final Controller controller;
+    private final NiceController controller;
 
     /**
      * Constructs a new set of calibration results.
      */
-    public CalibrationResults(Controller controller)
+    public CalibrationResults(NiceController controller)
     {
         this.controller = controller;
-        rangesByComponent = Collections.synchronizedMap(
-                new HashMap<Component, Range>());
+        rangesByControl = Collections.synchronizedMap(
+                new HashMap<NiceControl, Range>());
     }
 
     /**
@@ -107,23 +104,23 @@ public final class CalibrationResults
      */
     public CalibrationResults(CalibrationResults source)
     {
-        synchronized(source.rangesByComponent)
+        synchronized(source.rangesByControl)
         {
             this.controller = source.controller;
-            this.rangesByComponent = source.getResults();
+            this.rangesByControl = source.getResults();
         }
     }
 
     /**
      * Returns an independent copy of the range for the specified component.
      * 
-     * @param component the component to look up the range for
-     * @return an independent copy of the range for the specified component,
+     * @param control the control to look up the range for
+     * @return an independent copy of the range for the specified control,
      * if any has been recorded; otherwise, <code>null</code>
      */
-    public final Range getRange(Component component)
+    public final Range getRange(NiceControl control)
     {
-        Range range = rangesByComponent.get(component);
+        Range range = rangesByControl.get(control);
         if (range != null)
         {
             return new Range(range);
@@ -132,21 +129,21 @@ public final class CalibrationResults
     }
 
     /**
-     * Returns a list of all the components that currently have ranges
+     * Returns a list of all the controls that currently have ranges
      * in this result.
      * 
      * @return such a list
      */
-    public final Collection<Component> getComponentsSeen()
+    public final Collection<NiceControl> getComponentsSeen()
     {
-        synchronized(rangesByComponent)
+        synchronized(rangesByControl)
         {
-            return new ArrayList<Component>(rangesByComponent.keySet());
+            return new ArrayList<NiceControl>(rangesByControl.keySet());
         }
     }
 
     /**
-     * Returns a list of the components that currently have ranges of
+     * Returns a list of the controls that currently have ranges of
      * either singularity or non-singularity nature (as specified).
      * <p>
      * Ranges that are singularities represent a mathematical point;
@@ -155,19 +152,19 @@ public final class CalibrationResults
      * Ranges that are not singularities have a positive range size,
      * i.e. <code>low != high</code>.
      * 
-     * @param singularities whether components with singularity ranges
+     * @param singularities whether controls with singularity ranges
      * should be returned
-     * @return a map of components whose ranges are either singularities
+     * @return a map of controls whose ranges are either singularities
      * (if <code>singularities==true</code>) or not
      * (if <code>singularities==false</code>)
      */
-    public final Map<Component, Range> getResultsByRangeType(
+    public final Map<NiceControl, Range> getResultsByRangeType(
             boolean singularities)
     {
-        synchronized(rangesByComponent)
+        synchronized(rangesByControl)
         {
-            Map<Component, Range> results = new HashMap<Component, Range>();
-            for (Map.Entry<Component, Range> entry : rangesByComponent.entrySet())
+            Map<NiceControl, Range> results = new HashMap<NiceControl, Range>();
+            for (Map.Entry<NiceControl, Range> entry : rangesByControl.entrySet())
             {
                 Range range = entry.getValue();
                 if (range.isSingularity == singularities)
@@ -180,22 +177,22 @@ public final class CalibrationResults
     }
 
     /**
-     * Returns a list of the components that currently have ranges
+     * Returns a list of the controls that currently have ranges
      * where either endpoint is not one of the values in the set {-1,0,1}.
      * <p>
-     * Generally speaking most components are normalized to return maximum
+     * Generally speaking most controls are normalized to return maximum
      * and minimum values that are one of the values {-1,0,1}.
-     * This method finds components that don't appear to be behaving in this
+     * This method finds controls that don't appear to be behaving in this
      * manner based on the largest and smallest values seen.
      * 
-     * @return a map of components whose ranges appear to be non-standard
+     * @return a map of controls whose ranges appear to be non-standard
      */
-    public final Map<Component, Range> getNonStandardResults()
+    public final Map<NiceControl, Range> getNonStandardResults()
     {
-        synchronized(rangesByComponent)
+        synchronized(rangesByControl)
         {
-            Map<Component, Range> results = new HashMap<Component, Range>();
-            for (Map.Entry<Component, Range> entry : rangesByComponent.entrySet())
+            Map<NiceControl, Range> results = new HashMap<NiceControl, Range>();
+            for (Map.Entry<NiceControl, Range> entry : rangesByControl.entrySet())
             {
                 Range range = entry.getValue();
                 if (!(
@@ -222,13 +219,13 @@ public final class CalibrationResults
      * 
      * @return a copy of the results
      */
-    public final Map<Component, Range> getResults()
+    public final Map<NiceControl, Range> getResults()
     {
-        synchronized(rangesByComponent)
+        synchronized(rangesByControl)
         {
-            Map<Component, Range> results = new HashMap<Component, Range>(
-                    rangesByComponent.size());
-            for (Map.Entry<Component, Range> entry : rangesByComponent.entrySet())
+            Map<NiceControl, Range> results = new HashMap<NiceControl, Range>(
+                    rangesByControl.size());
+            for (Map.Entry<NiceControl, Range> entry : rangesByControl.entrySet())
             {
                 results.put(entry.getKey(), new Range(entry.getValue()));
             }
@@ -237,14 +234,14 @@ public final class CalibrationResults
     }
 
     /**
-     * Sets the range for the specified component.
+     * Sets the range for the specified control.
      * 
-     * @param component the component to set the range for
+     * @param control the control to set the range for
      * @param range the range to set
      */
-    final void setRange(Component component, Range range)
+    final void setRange(NiceControl control, Range range)
     {
-        rangesByComponent.put(component, range);
+        rangesByControl.put(control, range);
     }
 
     /**
@@ -252,19 +249,19 @@ public final class CalibrationResults
      */
     final void clear()
     {
-        rangesByComponent.clear();
+        rangesByControl.clear();
     }
 
     /**
      * Processes a value and updates the appropriate range as necessary.
      * 
-     * @param component the component from which the value was recorded
+     * @param control the control from which the value was recorded
      * @param value the value recorded; infinities and floats that are
      * representations of non-a-number (NaN) are ignored
      * @return <code>true</code> if a range was created or updated as a
      * result of this operation; otherwise, <code>false</code>
      */
-    final boolean processValue(final Component component, float value)
+    final boolean processValue(final NiceControl control, float value)
     {
         // Cannot process infinite or NaN values
         if (Float.isInfinite(value) || Float.isNaN(value))
@@ -272,13 +269,13 @@ public final class CalibrationResults
             return false;
         }
 
-        synchronized(rangesByComponent)
+        synchronized(rangesByControl)
         {
             final boolean updated;
-            Range range = rangesByComponent.get(component);
+            Range range = rangesByControl.get(control);
             if (range == null)
             {
-                rangesByComponent.put(component, new Range(value, value));
+                rangesByControl.put(control, new Range(value, value));
                 updated = true;
             }
             else
@@ -308,7 +305,7 @@ public final class CalibrationResults
      * 
      * @return the controller being calibrated
      */
-    public final Controller getController()
+    public final NiceController getController()
     {
         return controller;
     }
@@ -317,17 +314,17 @@ public final class CalibrationResults
     public final String toString()
     {
         StringBuilder buffer = new StringBuilder();
-        Map<Component, Range> results = getResults();
+        Map<NiceControl, Range> results = getResults();
         buffer.append(CalibrationResults.class.getName());
         buffer.append(": [");
         buffer.append("controller=");
         buffer.append(controller);
         buffer.append("]\nRanges by component:\n");
-        Iterator<Map.Entry<Component, Range>> iterator =
+        Iterator<Map.Entry<NiceControl, Range>> iterator =
             results.entrySet().iterator();
         while (iterator.hasNext())
         {
-            Map.Entry<Component, Range> entry = iterator.next();
+            Map.Entry<NiceControl, Range> entry = iterator.next();
             buffer.append("    ");
             buffer.append(entry.getKey());
             buffer.append("=");
