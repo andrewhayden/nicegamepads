@@ -2,7 +2,7 @@ package org.nicegamepads;
 
 /**
  * Interface for entities wishing to be notified of fine-grained changes to
- * a components' values.
+ * a controls values.
  * <p>
  * Warning: due to the nature of input devices, implementers should be
  * prepared to handle a <em>very large</em> number of events per second
@@ -10,12 +10,12 @@ package org.nicegamepads;
  * 
  * @author Andrew Hayden
  */
-public interface ComponentChangeListener
+public interface ControlChangeListener
 {
     /**
-     * Invoked whenever the value of a component changes.
+     * Invoked whenever the value of a control changes.
      * 
      * @param event event details
      */
-    public abstract void valueChanged(ComponentEvent event);
+    public abstract void valueChanged(ControlEvent event);
 }

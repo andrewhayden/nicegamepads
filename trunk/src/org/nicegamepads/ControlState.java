@@ -1,23 +1,16 @@
 package org.nicegamepads;
 
-import net.java.games.input.Component;
-
 /**
- * Encapsulated information about the state of a component.
+ * Encapsulated information about the state of a control.
  * 
  * @author Andrew Hayden
  */
-final class ComponentState
+final class ControlState
 {
     /**
-     * The component to which this state applies.
+     * The control to which this state applies.
      */
-    final Component component;
-
-    /**
-     * The type of the component, stored for convenience.
-     */
-    final ComponentType componentType;
+    final NiceControl control;
 
     /**
      * Timestamp at which this state was acquired.
@@ -25,7 +18,7 @@ final class ComponentState
     long currentTimestamp = -1L;
 
     /**
-     * Value of the component at the time this state was acquired.
+     * Value of the control at the time this state was acquired.
      */
     float currentValue = 0f;
 
@@ -35,7 +28,7 @@ final class ComponentState
     long lastTimestamp = -1L;
 
     /**
-     * The value of the component at the last polling time.
+     * The value of the control at the last polling time.
      */
     float lastValue = 0f;
 
@@ -45,14 +38,13 @@ final class ComponentState
     long lastTurboTimerStart = -1L;
 
     /**
-     * Constructs a new state to represent the specified component.
+     * Constructs a new state to represent the specified control.
      * 
-     * @param component the component
+     * @param control the control
      */
-    ComponentState(Component component)
+    ControlState(NiceControl control)
     {
-        this.component = component;
-        this.componentType = ControllerUtils.getComponentType(component);
+        this.control = control;
     }
 
     /**
@@ -60,10 +52,9 @@ final class ComponentState
      * 
      * @param source the source to copy from
      */
-    ComponentState(ComponentState source)
+    ControlState(ControlState source)
     {
-        this.component = source.component;
-        this.componentType = source.componentType;
+        this.control = source.control;
         this.currentTimestamp = source.currentTimestamp;
         this.currentValue = source.currentValue;
         this.lastTimestamp = source.lastTimestamp;
@@ -106,12 +97,10 @@ final class ComponentState
     public final String toString()
     {
         StringBuilder buffer = new StringBuilder();
-        buffer.append(ComponentState.class.getName());
+        buffer.append(ControlState.class.getName());
         buffer.append(": [");
-        buffer.append("component=");
-        buffer.append(component);
-        buffer.append(", componentType=");
-        buffer.append(componentType);
+        buffer.append("control=");
+        buffer.append(control);
         buffer.append(", currentValue=");
         buffer.append(currentValue);
         buffer.append(", lastValue=");
@@ -125,30 +114,20 @@ final class ComponentState
     }
 
     /**
-     * Returns the component to which this state applies.
+     * Returns the control to which this state applies.
      * 
-     * @return the component to which this state applies.
+     * @return the control to which this state applies.
      */
-    public final Component getComponent()
+    public final NiceControl getControl()
     {
-        return component;
-    }
-
-    /**
-     * Returns the type of the component, for convenience.
-     * 
-     * @return the type of the component, for convenience.
-     */
-    public final ComponentType getComponentType()
-    {
-        return componentType;
+        return control;
     }
 
     /**
      * Returns the timestamp at which this state was acquired, in milliseconds
      * since the epoch.
      * <p>
-     * If the component has never been polled, the value is -1.
+     * If the control has never been polled, the value is -1.
      * 
      * @return the timestamp at which this state was acquired, in milliseconds
      * since the epoch.
@@ -159,11 +138,11 @@ final class ComponentState
     }
 
     /**
-     * Returns the value of the component at the time this state was acquired.
+     * Returns the value of the control at the time this state was acquired.
      * <p>
-     * If the component has never been polled, the value is 0.
+     * If the control has never been polled, the value is 0.
      * 
-     * @return the value of the component at the time this state was acquired.
+     * @return the value of the control at the time this state was acquired.
      */
     public final float getCurrentValue()
     {
@@ -174,7 +153,7 @@ final class ComponentState
      * Returns the timestamp at which the last polling was completed,
      * in milliseconds since the epoch.
      * <p>
-     * If the component has never been polled, the value is -1.
+     * If the control has never been polled, the value is -1.
      * 
      * @return the timestamp at which the last polling was completed,
      * in milliseconds since the epoch.
@@ -185,11 +164,11 @@ final class ComponentState
     }
 
     /**
-     * Returns the value of the component at the last polling time.
+     * Returns the value of the control at the last polling time.
      * <p>
-     * If the component has never been polled, the value is zero.
+     * If the control has never been polled, the value is zero.
      * 
-     * @return the value of the component at the last polling time.
+     * @return the value of the control at the last polling time.
      */
     public final float getLastValue()
     {

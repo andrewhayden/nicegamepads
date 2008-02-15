@@ -1,51 +1,46 @@
 package org.nicegamepads;
 
-import java.io.File;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
-import net.java.games.input.Component;
-import net.java.games.input.Controller;
 
 public class VirtualAnalogStickTest
 {
     public final static void main(String[] args)
     {
         ControllerManager.initialize();
-        List<Controller> gamepads = ControllerUtils.getAllGamepads(false);
+        List<NiceController> gamepads = NiceController.getAllControllers();
 
-        Controller controller = gamepads.get(0);
-        System.out.println("gamepad: " + controller.getName() + "; hash=" + ControllerUtils.generateTypeCode(controller));
-        System.out.println("on port: " + controller.getPortNumber() + " (port type=" + controller.getPortType() + ")");
+        NiceController controller = gamepads.get(0);
+        System.out.println("gamepad: " + controller.getDeclaredName() + "; fingerprint=" + controller.getFingerprint());
 
         ControllerConfiguration config = new ControllerConfiguration(controller);
-        ControllerUtils.setAnalogDeadZones(controller, config, true, -0.1f, 0.1f);
-        ControllerUtils.setAnalogGranularities(controller, config, true, 0.1f);
+        controller.setAnalogDeadZones(-0.1f, 0.1f);
+        controller.setAnalogGranularities(0.1f);
         System.out.println(config);
 
         ControllerConfigurator configurator =
-            new ControllerConfigurator(controller, config, true);
+            new ControllerConfigurator(controller, config);
         
-        ComponentEvent event = null;
-        Set<Component> identifiedComponents = new HashSet<Component>();
-        Component eastWest = null;
+        ControlEvent event = null;
+        Set<NiceControl> identifiedControls = new HashSet<NiceControl>();
+        NiceControl eastWest = null;
         HorizontalOrientation eastWestOrientation = null;
-        Component northSouth = null;
+        NiceControl northSouth = null;
         VerticalOrientation northSouthOrientation = null;
         try
         {
-            ComponentConfiguration componentConfig = null;
+            ControlConfiguration controlConfig = null;
 
             // East-west
             System.out.println("Identify east-west axis by pushing east...");
-            event = configurator.identifyComponent(ComponentType.AXIS, identifiedComponents);
-            System.out.println("Component identified: " + event);
-            componentConfig = config.getConfigurationDeep(event.sourceComponent);
-            componentConfig.setUserDefinedId(0);
-            identifiedComponents.add(event.sourceComponent);
-            eastWest = event.sourceComponent;
+            event = configurator.identifyControl(NiceControlType.CONTINUOUS_INPUT, identifiedControls);
+            System.out.println("Control identified: " + event);
+            controlConfig = config.getConfigurationDeep(event.sourceControl);
+            controlConfig.setUserDefinedId(0);
+            identifiedControls.add(event.sourceControl);
+            eastWest = event.sourceControl;
             if (event.previousValue > 0)
             {
                 // Normal orientation
@@ -58,12 +53,12 @@ public class VirtualAnalogStickTest
 
             // North-south
             System.out.println("Identify north-south axis by pushing south ...");
-            event = configurator.identifyComponent(ComponentType.AXIS, identifiedComponents);
-            System.out.println("Component identified: " + event);
-            componentConfig = config.getConfigurationDeep(event.sourceComponent);
-            componentConfig.setUserDefinedId(1);
-            identifiedComponents.add(event.sourceComponent);
-            northSouth = event.sourceComponent;
+            event = configurator.identifyControl(NiceControlType.CONTINUOUS_INPUT, identifiedControls);
+            System.out.println("Control identified: " + event);
+            controlConfig = config.getConfigurationDeep(event.sourceControl);
+            controlConfig.setUserDefinedId(1);
+            identifiedControls.add(event.sourceControl);
+            northSouth = event.sourceControl;
             if (event.previousValue > 0)
             {
                 // Normal orientation
@@ -79,7 +74,7 @@ public class VirtualAnalogStickTest
             e.printStackTrace();
         }
 
-        ControllerPoller poller = new ControllerPoller(config, true);
+        ControllerPoller poller = new ControllerPoller(config);
         
         //final ControllerConfiguration staticConfig = config;
         final VirtualAnalogStick virtualStick = new VirtualAnalogStick(

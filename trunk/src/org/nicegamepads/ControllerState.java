@@ -5,8 +5,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import net.java.games.input.Component;
-
 /**
  * Encapsulates the state of a controller.
  * 
@@ -15,11 +13,11 @@ import net.java.games.input.Component;
 public final class ControllerState
 {
     /**
-     * All of the component states associated with this controller state,
+     * All of the control states associated with this controller state,
      * possibly recursively expanded (according to the constructor parameters
      * provided)
      */
-    final ComponentState[] componentStates;
+    final ControlState[] controlStates;
 
     /**
      * The configuration associated with this state.
@@ -27,10 +25,10 @@ public final class ControllerState
     final ControllerConfiguration configuration;
 
     /**
-     * Lazily-initialized mapping of states by their components.
+     * Lazily-initialized mapping of states by their controls.
      */
-    private final Map<Component, ComponentState>
-        cachedStatesByComponent;
+    private final Map<NiceControl, ControlState>
+        cachedStatesByControl;
 
     /**
      * The last time at which this controller state was completely refreshed,
@@ -42,33 +40,25 @@ public final class ControllerState
      * Constructs a new controller state for the specified controller.
      * 
      * @param configuration the configuration to create state for
-     * @param deep whether or not the recursively descend into all
-     * subcontrollers for the purpose of locating components;
-     * if <code>true</code>, the controller state represents the state of
-     * all of its components as well as the components of all of its
-     * subcontrollers, recursively expanded; otherwise, the controller state
-     * represents only the state of the components that are the immediate
-     * children of the specified controller
      */
-    ControllerState(ControllerConfiguration configuration, boolean deep)
+    ControllerState(ControllerConfiguration configuration)
     {
         this.configuration = configuration;
-        List<Component> allComponents =
-            ControllerUtils.getComponents(
-                    configuration.getController(), deep);
+        List<NiceControl> allControls =
+            configuration.getController().getControls();
 
-        // Create component states.
-        componentStates = new ComponentState[allComponents.size()];
-        Map<Component, ComponentState> tempMap =
-            new HashMap<Component, ComponentState>();
+        // Create control states.
+        controlStates = new ControlState[allControls.size()];
+        Map<NiceControl, ControlState> tempMap =
+            new HashMap<NiceControl, ControlState>();
         int index = 0;
-        for (Component component : allComponents)
+        for (NiceControl control : allControls)
         {
-            componentStates[index] = new ComponentState(component);
-            tempMap.put(component, componentStates[index]);
+            controlStates[index] = new ControlState(control);
+            tempMap.put(control, controlStates[index]);
             index++;
         }
-        cachedStatesByComponent = Collections.unmodifiableMap(tempMap);
+        cachedStatesByControl = Collections.unmodifiableMap(tempMap);
     }
 
     /**
@@ -83,35 +73,35 @@ public final class ControllerState
     {
         configuration = new ControllerConfiguration(source.configuration);
         timestamp = source.timestamp;
-        componentStates = new ComponentState[source.componentStates.length];
-        Map<Component, ComponentState> tempMap =
-            new HashMap<Component, ComponentState>();
-        for (int index=0; index<componentStates.length; index++)
+        controlStates = new ControlState[source.controlStates.length];
+        Map<NiceControl, ControlState> tempMap =
+            new HashMap<NiceControl, ControlState>();
+        for (int index=0; index<controlStates.length; index++)
         {
-            componentStates[index] =
-                new ComponentState(source.componentStates[index]);
+            controlStates[index] =
+                new ControlState(source.controlStates[index]);
             tempMap.put(
-                    componentStates[index].component, componentStates[index]);
+                    controlStates[index].control, controlStates[index]);
         }
-        cachedStatesByComponent = Collections.unmodifiableMap(tempMap);
+        cachedStatesByControl = Collections.unmodifiableMap(tempMap);
     }
 
     /**
-     * Returns the state for the specified component within this controller
+     * Returns the state for the specified control within this controller
      * state.
      * 
-     * @param component the component whose state should be retrieved
-     * @return the state of the component
-     * @throws NoSuchComponentException if the specified component is not
+     * @param control the control whose state should be retrieved
+     * @return the state of the control
+     * @throws NoSuchControlException if the specified control is not
      * part of the controller associated with this state
      */
-    public final ComponentState getComponentState(Component component)
+    public final ControlState getControlState(NiceControl control)
     {
-        ComponentState state = cachedStatesByComponent.get(component);
+        ControlState state = cachedStatesByControl.get(control);
         if (state == null)
         {
-            throw new NoSuchComponentException(
-                    "Component does not exist in the controller "
+            throw new NoSuchControlException(
+                    "Control does not exist in the controller "
                     + "associated with this state.");
         }
         return state;
