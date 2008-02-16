@@ -26,16 +26,6 @@ public class ControllerConfiguration implements Cloneable
         controlConfigurations;
 
     /**
-     * Configurations for each subcontroller that is a direct child of this
-     * controller configuration.
-     * <p>
-     * This is explicitly a linked hash map to make it known that insertion
-     * order is preserved and that null values are allowed.
-     */
-    private LinkedHashMap<NiceController, ControllerConfiguration>
-        subControllerConfigurations;
-
-    /**
      * Cache of control locations in the subcontroller hierarchy.
      * <p>
      * This is used to speed binding and looking up configurations for
@@ -46,7 +36,7 @@ public class ControllerConfiguration implements Cloneable
             new HashMap<NiceControl, ControllerConfiguration>();
 
     /**
-     * Type code for the controller, can be used as a sanity check during
+     * Fingerprint for the controller, can be used as a sanity check during
      * loading.
      */
     private int controllerFingerprint;
@@ -66,7 +56,7 @@ public class ControllerConfiguration implements Cloneable
      * <p>
      * The controller is used solely for determining the various attributes
      * that need to be persisted.  That is, it is used primarily for
-     * examination of hardware.  A unique type code for the controller is
+     * examination of hardware.  A unique fingerprint for the controller is
      * inferred and kept as a sanity check for loading the configuration
      * in the future.
      * 
@@ -92,19 +82,6 @@ public class ControllerConfiguration implements Cloneable
         {
             controlConfigurations.put(control, new ControlConfiguration());
         }
-
-        // Fill in config info for nested controllers
-        List<NiceController> subControllers = controller.getControllers();
-        int numSubControllers = subControllers.size();
-        subControllerConfigurations =
-            new LinkedHashMap<NiceController, ControllerConfiguration>(
-                    numSubControllers);
-        for (int index=0; index<numSubControllers; index++)
-        {
-            subControllerConfigurations.put(
-                    subControllers.get(index), new ControllerConfiguration(
-                            subControllers.get(index)));
-        }
     }
 
     /**
@@ -129,9 +106,6 @@ public class ControllerConfiguration implements Cloneable
         controlConfigurations =
             new LinkedHashMap<NiceControl, ControlConfiguration>(
                     source.controlConfigurations.size());
-        subControllerConfigurations =
-            new LinkedHashMap<NiceController, ControllerConfiguration>(
-                    source.subControllerConfigurations.size());
 
         // Copy will have blank cache of control locations by controller
         // config.  This is exactly what should happen, since we are creating
@@ -150,22 +124,6 @@ public class ControllerConfiguration implements Cloneable
             else
             {
                 controlConfigurations.put(entry.getKey(), null);
-            }
-        }
-
-        // Recursively copy subcontroller configurations
-        for (Map.Entry<NiceController, ControllerConfiguration> entry :
-            source.subControllerConfigurations.entrySet())
-        {
-            ControllerConfiguration sourceConfig = entry.getValue();
-            if (sourceConfig != null)
-            {
-                subControllerConfigurations.put(entry.getKey(),
-                        new ControllerConfiguration(sourceConfig));
-            }
-            else
-            {
-                subControllerConfigurations.put(entry.getKey(), null);
             }
         }
     }
@@ -187,9 +145,6 @@ public class ControllerConfiguration implements Cloneable
         clone.controlConfigurations =
             new LinkedHashMap<NiceControl, ControlConfiguration>(
                     controlConfigurations.size());
-        clone.subControllerConfigurations =
-            new LinkedHashMap<NiceController, ControllerConfiguration>(
-                    subControllerConfigurations.size());
 
         // Clone will have blank cache of control locations by controller
         // config.  This is exactly what should happen, since we are creating
@@ -208,22 +163,6 @@ public class ControllerConfiguration implements Cloneable
             else
             {
                 clone.controlConfigurations.put(entry.getKey(), null);
-            }
-        }
-
-        // Recursively copy subcontroller configurations
-        for (Map.Entry<NiceController, ControllerConfiguration> entry :
-            subControllerConfigurations.entrySet())
-        {
-            ControllerConfiguration sourceConfig = entry.getValue();
-            if (sourceConfig != null)
-            {
-                clone.subControllerConfigurations.put(entry.getKey(),
-                        sourceConfig.clone());
-            }
-            else
-            {
-                clone.subControllerConfigurations.put(entry.getKey(), null);
             }
         }
 
@@ -260,31 +199,8 @@ public class ControllerConfiguration implements Cloneable
                 ControllerConfiguration configuration)
     {
         // Do a traversal of the entire tree of configurations, breadth-first
-        List<ControlConfiguration> allConfigs =
-            new ArrayList<ControlConfiguration>();
-        enumerationHelper(configuration, allConfigs);
-        return allConfigs;
-    }
-
-    /**
-     * Recurses into subcontroller configs, enumerating their children in
-     * a breadth-first traversal.
-     * 
-     * @param allConfigs list in which to place results
-     */
-    private final static void enumerationHelper(
-            ControllerConfiguration target,
-            List<ControlConfiguration> allConfigs)
-    {
-        for (ControlConfiguration config : target.controlConfigurations.values())
-        {
-            allConfigs.add(config);
-        }
-
-        for (ControllerConfiguration config : target.subControllerConfigurations.values())
-        {
-            enumerationHelper(config, allConfigs);
-        }
+        return new ArrayList<ControlConfiguration>(
+                configuration.controlConfigurations.values());
     }
 
     /**
@@ -352,12 +268,10 @@ public class ControllerConfiguration implements Cloneable
             prefix = "";
         }
 
-        destination.put(prefix + "controllerTypeCode",
+        destination.put(prefix + "controllerFingerpring",
                 Integer.toString(controllerFingerprint));
         destination.put(prefix + "numControls",
                 Integer.toString(controlConfigurations.size()));
-        destination.put(prefix + "numSubControllers",
-                Integer.toString(subControllerConfigurations.size()));
 
         // Write out all controls.
         int counter = 0;
@@ -368,29 +282,21 @@ public class ControllerConfiguration implements Cloneable
             counter++;
         }
 
-        counter = 0;
-        for (ControllerConfiguration config : subControllerConfigurations.values())
-        {
-            config.saveToMap(
-                    prefix + "subController" + counter, destination);
-            counter++;
-        }
-
         return destination;
     }
 
     /**
-     * Returns the type code from the specified mappings as if part of a
+     * Returns the fingerprint from the specified mappings as if part of a
      * complete {@link #loadFromMap(String, Map)}, but does not
      * load the value into this configuration.
      * 
      * @param prefix the prefix, as in {@link #loadFromMap(String, Map)}
-     * @param source the source to lookup the type code in
-     * @return the type code
+     * @param source the source to lookup the fingerprint in
+     * @return the fingerprint
      * @throws ConfigurationException if the value isn't found in the
      * specified source
      */
-    final static int readControllerTypeCodeFromMap(
+    final static int readControllerFingerprintFromMap(
             String prefix, Map<String,String> source)
     throws ConfigurationException
     {
@@ -407,7 +313,7 @@ public class ControllerConfiguration implements Cloneable
             prefix = "";
         }
         return ConfigurationUtils.getInteger(
-                source, prefix + "controllerTypeCode");
+                source, prefix + "controllerFingerprint");
     }
 
     /**
@@ -446,11 +352,9 @@ public class ControllerConfiguration implements Cloneable
         }
 
         controllerFingerprint = ConfigurationUtils.getInteger(
-                source, prefix + "controllerTypeCode");
+                source, prefix + "controllerFingerprint");
         int numControls = ConfigurationUtils.getInteger(
                 source, prefix + "numControls");
-        int numSubControllers = ConfigurationUtils.getInteger(
-                source, prefix + "numSubControllers");
 
         // Read all controls
         Iterator<NiceControl> controlIterator =
@@ -465,23 +369,6 @@ public class ControllerConfiguration implements Cloneable
             config.loadFromProperties(
                     prefix + "control" + x, source);
             controlConfigurations.put(controlIterator.next(), config);
-        }
-
-        // Read all controllers
-        Iterator<NiceController> controllerIterator =
-            subControllerConfigurations.keySet().iterator();
-        for (int x=0; x<numSubControllers; x++)
-        {
-            // Notice that order is preserved by the
-            // "controllerConfigurations" collection, so that our integer
-            // mappings here will always be the same every single time
-            // and will stay in-sync.
-            NiceController controller = controllerIterator.next();
-            ControllerConfiguration config =
-                new ControllerConfiguration(controller);
-            config.loadFromMap(
-                    prefix + "subController" + x, source);
-            subControllerConfigurations.put(controller, config);
         }
     }
 
@@ -549,131 +436,6 @@ public class ControllerConfiguration implements Cloneable
     }
 
     /**
-     * Returns the configuration for the specified control, searching
-     * any and all subcontroller configurations if necessary.
-     * <p>
-     * Since controls cannot be added to or removed from a configuration
-     * at runtime, recursive search results are cached for efficiency.
-     * Future lookups of the same control in the same configuration object
-     * will generally be very fast (no attempt is made to speed up lookups
-     * for non-existent controls, however).
-     * <p>
-     * Note that this method will throw a {@link ConfigurationException} if
-     * the caller attempts to find a configuration to a nonexistent control.
-     * Strictly speaking, no harm would be done by doing so - but if the caller
-     * is trying to find to a nonexistent control, then a serious logic
-     * error has probably occurred on the calling side.
-     * 
-     * @param control the control to retrieve the configuration for
-     * @return the configuration for the specified control, if the
-     * control exists in this configuration; otherwise, <code>null</code>
-     */
-    public final ControlConfiguration getConfigurationDeep(
-            NiceControl control)
-    throws ConfigurationException
-    {
-        ControllerConfiguration source =
-            cachedConfigurationsByControl.get(control);
-        if (source == null)
-        {
-            source = controlSearchHelper(this, control);
-            if (source == null)
-            {
-                throw new ConfigurationException(
-                    "No such control in this configuration.");
-            }
-
-            // If we get this far, we found something.  Cache it for
-            // future speed.
-            cachedConfigurationsByControl.put(control, source);
-        }
-        return source.getConfiguration(control);
-    }
-
-    /**
-     * Sets the configuration for the specified configuration, searching
-     * subcontrollers as necessary until the specified control is located.
-     * <p>
-     * Unlike {@link #setConfiguration(Control, ControlConfiguration)},
-     * this method performs a deep search into any and all subcontrollers
-     * (if necessary) trying to locate the control.  This is convenient
-     * when the caller does not care where the control resides, and is
-     * only concerned with the "flattened" set of all controls in the
-     * controller (as might be found using the utility method
-     * {@link ControllerUtils#getControls(Controller, boolean)}).
-     * <p>
-     * Note that this method will throw a {@link ConfigurationException} if
-     * the caller attempts to bind a configuration to a nonexistent control.
-     * Strictly speaking, no harm would be done by doing so - but if the caller
-     * is trying to bind to a nonexistent control, then a serious logic
-     * error has probably occurred on the calling side.
-     * <p>
-     * Since controls cannot be added to or removed from a configuration
-     * at runtime, recursive search results are cached for efficiency.
-     * Future updates to the same control in the same configuration object
-     * will generally be very fast (no attempt is made to speed up lookups
-     * for non-existent controls, however).
-     * 
-     * @param control the top-level control to start searching in
-     * @param configuration the configuration to set
-     * @throws ConfigurationException if there is no such control in
-     * this configuration or any of its subcontroller configurations
-     */
-    public final void setConfigurationDeep(
-            NiceControl control, ControlConfiguration configuration)
-    throws ConfigurationException
-    {
-        ControllerConfiguration target =
-            cachedConfigurationsByControl.get(control);
-        if (target == null)
-        {
-            target = controlSearchHelper(this, control);
-            if (target == null)
-            {
-                throw new ConfigurationException(
-                    "No such control in this configuration.");
-            }
-    
-            // If we get this far, we found something.  Cache it for
-            // future speed.
-            cachedConfigurationsByControl.put(control, target);
-        }
-
-        target.setConfiguration(control, configuration);
-    }
-
-    /**
-     * Recursively searches the controller hierarchy for the specified
-     * target control.
-     * 
-     * @param configuration the configuration to begin searching in
-     * @param target the control to locate
-     * @return if the control is found, the controller configuration that
-     * contains the control; otherwise, <code>null</code>
-     */
-    private final ControllerConfiguration controlSearchHelper(
-            ControllerConfiguration configuration, NiceControl target)
-    {
-        if (configuration.controlConfigurations.containsKey(target))
-        {
-            return configuration;
-        }
-
-        ControllerConfiguration result = null;
-        for (ControllerConfiguration subConfig :
-            subControllerConfigurations.values())
-        {
-            result = controlSearchHelper(subConfig, target);
-            if (result != null)
-            {
-                return result;
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * Not for public use.
      * <p>
      * Package-level access to mutate the control configurations.
@@ -689,21 +451,7 @@ public class ControllerConfiguration implements Cloneable
     /**
      * Not for public use.
      * <p>
-     * Package-level access to mutate the controller configurations.
-     * 
-     * @param subControllerConfigurations
-     */
-    final void setSubControllerConfigurations(
-            LinkedHashMap<NiceController, ControllerConfiguration>
-                subControllerConfigurations)
-    {
-        this.subControllerConfigurations = subControllerConfigurations;
-    }
-
-    /**
-     * Not for public use.
-     * <p>
-     * Package-level access to mutate the controller type code.
+     * Package-level access to mutate the controller fingerprint.
      * 
      * @param controllerTypeCode
      */
@@ -716,7 +464,7 @@ public class ControllerConfiguration implements Cloneable
      * Not for public use.
      * <p>
      * Package-level access to mutate the controller.
-     * This method does not alter the type code, which must be set
+     * This method does not alter the fingerprint, which must be set
      * separately.
      * 
      * @param controller
@@ -741,24 +489,11 @@ public class ControllerConfiguration implements Cloneable
     /**
      * Not for public use.
      * <p>
-     * Package-level access to access the controller configurations.
+     * Package-level access to access the controller fingerprint.
      * 
-     * @return a reference to the live controller configurations map itself
+     * @return the fingerprint of the controller
      */
-    final LinkedHashMap<NiceController, ControllerConfiguration>
-    getSubControllerConfigurations()
-    {
-        return subControllerConfigurations;
-    }
-
-    /**
-     * Not for public use.
-     * <p>
-     * Package-level access to access the controller type code.
-     * 
-     * @return the type code of the controller
-     */
-    final int getControllerTypeCode()
+    final int getControllerFingerprint()
     {
         return controllerFingerprint;
     }
@@ -814,7 +549,7 @@ public class ControllerConfiguration implements Cloneable
         buffer.append(": [");
         buffer.append("controller=");
         buffer.append(configuration.controller);
-        buffer.append(", controllerTypeCode=");
+        buffer.append(", controllerFingerprint=");
         buffer.append(configuration.controllerFingerprint);
         buffer.append("]\n");
         buffer.append(prefix);
@@ -828,15 +563,6 @@ public class ControllerConfiguration implements Cloneable
             buffer.append("=");
             buffer.append(entry.getValue());
             buffer.append("\n");
-        }
-        buffer.append("\n");
-        buffer.append(prefix);
-        buffer.append("SubController Configurations:\n");
-        prefix += "    ";
-        for(ControllerConfiguration subControllerConfig :
-            configuration.subControllerConfigurations.values())
-        {
-            buffer.append(toStringHelper(subControllerConfig, buffer, prefix));
         }
         return buffer.toString();
     }

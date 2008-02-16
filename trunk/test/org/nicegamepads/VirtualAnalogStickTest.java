@@ -37,7 +37,7 @@ public class VirtualAnalogStickTest
             System.out.println("Identify east-west axis by pushing east...");
             event = configurator.identifyControl(NiceControlType.CONTINUOUS_INPUT, identifiedControls);
             System.out.println("Control identified: " + event);
-            controlConfig = config.getConfigurationDeep(event.sourceControl);
+            controlConfig = config.getConfiguration(event.sourceControl);
             controlConfig.setUserDefinedId(0);
             identifiedControls.add(event.sourceControl);
             eastWest = event.sourceControl;
@@ -55,7 +55,7 @@ public class VirtualAnalogStickTest
             System.out.println("Identify north-south axis by pushing south ...");
             event = configurator.identifyControl(NiceControlType.CONTINUOUS_INPUT, identifiedControls);
             System.out.println("Control identified: " + event);
-            controlConfig = config.getConfigurationDeep(event.sourceControl);
+            controlConfig = config.getConfiguration(event.sourceControl);
             controlConfig.setUserDefinedId(1);
             identifiedControls.add(event.sourceControl);
             northSouth = event.sourceControl;

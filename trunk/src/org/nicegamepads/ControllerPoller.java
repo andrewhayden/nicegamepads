@@ -363,7 +363,7 @@ public class ControllerPoller
         for (ControlState state : controllerState.controlStates)
         {
             // Look up configuration for this control
-            controlConfig = config.getConfigurationDeep(state.control);
+            controlConfig = config.getConfiguration(state.control);
             // Poll the value
             float polledValue = state.control.getPollData();
             // Transform according to configuration rules
