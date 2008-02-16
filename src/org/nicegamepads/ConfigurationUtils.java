@@ -584,23 +584,6 @@ final class ConfigurationUtils
                                         control)));
             }
             setControlConfigurations(newComponentConfigurations);
-
-            // Fill in config info for nested controllers
-            List<NiceController> subControllers = controller.getControllers();
-            int numSubControllers = subControllers.size();
-            LinkedHashMap<NiceController, ControllerConfiguration>
-                newSubControllerConfigurations =
-                    new LinkedHashMap<NiceController, ControllerConfiguration>(
-                            numSubControllers);
-            for (int index=0; index<numSubControllers; index++)
-            {
-                newSubControllerConfigurations.put(
-                        subControllers.get(index),
-                            new ImmutableControllerConfiguration(
-                                    source.getSubControllerConfigurations()
-                                        .get(subControllers.get(index))));
-            }
-            setSubControllerConfigurations(newSubControllerConfigurations);
         }
 
         /**
@@ -619,12 +602,10 @@ final class ConfigurationUtils
             // existing config objects.
             NiceController controller = source.getController();
             setController(controller);
-            setControllerFingerprint(source.getControllerTypeCode());
+            setControllerFingerprint(source.getControllerFingerprint());
             setCachedConfigurationsByControl(
                     source.getCachedConfigurationsByControl());
             setControlConfigurations(source.getControlConfigurations());
-            setSubControllerConfigurations(
-                    source.getSubControllerConfigurations());
         }
 
         /**
@@ -646,9 +627,8 @@ final class ConfigurationUtils
             ImmutableControllerConfiguration clone =
                 new ImmutableControllerConfiguration();
             clone.setController(getController());
-            clone.setControllerFingerprint(getControllerTypeCode());
+            clone.setControllerFingerprint(getControllerFingerprint());
             clone.setControlConfigurations(getControlConfigurations());
-            clone.setSubControllerConfigurations(getSubControllerConfigurations());
             return clone;
         }
 

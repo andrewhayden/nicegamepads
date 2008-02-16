@@ -35,7 +35,7 @@ public class ConfigurationPersistenceTest
                 event = configurator.identifyControl(NiceControlType.DISCRETE_INPUT, identifiedComponents);
                 System.out.println("Component identified: " + event);
                 ControlConfiguration componentConfig =
-                    config.getConfigurationDeep(event.sourceControl);
+                    config.getConfiguration(event.sourceControl);
                 componentConfig.setValueId(event.previousValue, buttonIndex);
                 componentConfig.setUserDefinedId(buttonIndex);
                 System.out.println("Bound value " + event.previousValue + " to user defined id " + buttonIndex);
@@ -48,7 +48,7 @@ public class ConfigurationPersistenceTest
                 event = configurator.identifyControl(NiceControlType.CONTINUOUS_INPUT, identifiedComponents);
                 System.out.println("Component identified: " + event);
                 ControlConfiguration componentConfig =
-                    config.getConfigurationDeep(event.sourceControl);
+                    config.getConfiguration(event.sourceControl);
                 componentConfig.setValueId(event.previousValue, axisIndex);
                 componentConfig.setUserDefinedId(axisIndex);
                 System.out.println("Bound value " + event.previousValue + " to user defined id " + axisIndex);

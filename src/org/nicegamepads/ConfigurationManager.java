@@ -587,7 +587,7 @@ public final class ConfigurationManager
         try
         {
             loadedFingerprint =
-                ControllerConfiguration.readControllerTypeCodeFromMap(
+                ControllerConfiguration.readControllerFingerprintFromMap(
                         STANDARD_PREFIX, asMap);
         }
         catch(ConfigurationException e)
