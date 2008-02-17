@@ -27,7 +27,7 @@ public final class ControllerState
     /**
      * Lazily-initialized mapping of states by their controls.
      */
-    private final Map<NiceControl, ControlState> cachedStatesByControl;
+    private final Map<NiceControl, ControlState> statesByControl;
 
     /**
      * The last time at which this controller state was completely refreshed,
@@ -56,7 +56,7 @@ public final class ControllerState
             tempMap.put(control, controlStates[index]);
             index++;
         }
-        cachedStatesByControl = Collections.unmodifiableMap(tempMap);
+        statesByControl = Collections.unmodifiableMap(tempMap);
     }
 
     /**
@@ -81,7 +81,7 @@ public final class ControllerState
             tempMap.put(
                     controlStates[index].control, controlStates[index]);
         }
-        cachedStatesByControl = Collections.unmodifiableMap(tempMap);
+        statesByControl = Collections.unmodifiableMap(tempMap);
     }
 
     /**
@@ -95,7 +95,7 @@ public final class ControllerState
      */
     public final ControlState getControlState(NiceControl control)
     {
-        ControlState state = cachedStatesByControl.get(control);
+        ControlState state = statesByControl.get(control);
         if (state == null)
         {
             throw new NoSuchControlException(

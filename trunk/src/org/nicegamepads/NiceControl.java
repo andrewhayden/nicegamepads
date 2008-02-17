@@ -156,4 +156,17 @@ public class NiceControl
     {
         return controller;
     }
+
+    /**
+     * Polls the current value of the control and places it into the
+     * specified state container.
+     * 
+     * @param state the state container to place the value into
+     * @param timestamp timestamp to apply to the values
+     */
+    final void poll(ControlState state, long timestamp)
+    {
+        float value = jinputComponent.getPollData();
+        state.rawCurrentValue = value;
+    }
 }
