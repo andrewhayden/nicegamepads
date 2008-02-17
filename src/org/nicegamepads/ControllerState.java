@@ -20,15 +20,14 @@ public final class ControllerState
     final ControlState[] controlStates;
 
     /**
-     * The configuration associated with this state.
+     * The controller whose state this is.
      */
-    final ControllerConfiguration configuration;
+    final NiceController controller;
 
     /**
      * Lazily-initialized mapping of states by their controls.
      */
-    private final Map<NiceControl, ControlState>
-        cachedStatesByControl;
+    private final Map<NiceControl, ControlState> cachedStatesByControl;
 
     /**
      * The last time at which this controller state was completely refreshed,
@@ -41,11 +40,10 @@ public final class ControllerState
      * 
      * @param configuration the configuration to create state for
      */
-    ControllerState(ControllerConfiguration configuration)
+    ControllerState(NiceController controller)
     {
-        this.configuration = configuration;
-        List<NiceControl> allControls =
-            configuration.getController().getControls();
+        this.controller = controller;
+        List<NiceControl> allControls = controller.getControls();
 
         // Create control states.
         controlStates = new ControlState[allControls.size()];
@@ -71,7 +69,7 @@ public final class ControllerState
      */
     ControllerState(ControllerState source)
     {
-        configuration = new ControllerConfiguration(source.configuration);
+        this.controller = source.controller;
         timestamp = source.timestamp;
         controlStates = new ControlState[source.controlStates.length];
         Map<NiceControl, ControlState> tempMap =

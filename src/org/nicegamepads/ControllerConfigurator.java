@@ -50,11 +50,6 @@ public class ControllerConfigurator
     private volatile CalibrationHelper calibrationHelper = null;
 
     /**
-     * Poller used to poll the controller.
-     */
-    private final ControllerPoller poller;
-
-    /**
      * Whether or not we are currently calibrating.
      */
     private boolean calibrating = false;
@@ -102,7 +97,6 @@ public class ControllerConfigurator
             this.config = new ControllerConfiguration(defaultConfiguration);
         }
         eligibleControls = new HashSet<NiceControl>(controller.getControls());
-        poller = new ControllerPoller(this.config);
     }
 
     /**
@@ -236,6 +230,14 @@ public class ControllerConfigurator
                 throw new IllegalStateException("Already calibrating.");
             }
 
+            controller.getConfigurationLive().lockConfiguration();
+            // Make copy of existing configuration to restore.
+            final ControllerConfiguration originalConfiguration =
+                new ControllerConfiguration(controller.getConfigurationLive());
+
+            controller.applyConfiguration(config);
+            ControllerPoller poller = ControllerPoller.getInstance(controller);
+
             identificationThread = Thread.currentThread();
 
             CountDownLatch latch = new CountDownLatch(1);
@@ -243,10 +245,6 @@ public class ControllerConfigurator
                 new IdentificationListener(
                         latch, allowedTypes, ineligibleControls);
             poller.addControlPollingListener(myListener);
-            poller.setConfiguration(config);
-
-            // TODO: configurable polling interval
-            poller.startPolling(33L, TimeUnit.MILLISECONDS);
 
             boolean success = false;
             try
@@ -265,8 +263,12 @@ public class ControllerConfigurator
             {
                 // Always remove the listener and halt polling!
                 poller.removeControlPollingListener(myListener);
-                poller.stopPolling();
                 identificationThread = null;
+
+                // Restore original configuration
+                controller.applyConfiguration(originalConfiguration);
+                // Unlock configuration now that it has been restored
+                controller.getConfigurationLive().unlockConfiguration(true);
             }
 
             if (success)
@@ -304,8 +306,8 @@ public class ControllerConfigurator
             calibrating = true;
             calibrationHelper = new CalibrationHelper();
             calibrationHelper.start();
-            poller.addControlPollingListener(calibrationHelper);
-            poller.setConfiguration(config);
+            ControllerPoller.getInstance(controller)
+                .addControlPollingListener(calibrationHelper);
 
             ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
                 @Override
@@ -317,9 +319,6 @@ public class ControllerConfigurator
                     }
                 }
             });
-
-            // TODO: configurable polling interval
-            poller.startPolling(33L, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -339,8 +338,8 @@ public class ControllerConfigurator
 
             // Stop calibration.
             calibrationHelper.stop();
-            poller.removeControlPollingListener(calibrationHelper);
-            poller.stopPolling();
+            ControllerPoller.getInstance(controller)
+                .removeControlPollingListener(calibrationHelper);
             calibrating = false;
 
             ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
@@ -436,7 +435,7 @@ public class ControllerConfigurator
             }
 
             if (allowedTypes != null && !allowedTypes.contains(
-                    event.sourceControl.controlType))
+                    event.sourceControl.getControlType()))
             {
                 // Allowed types are constrained, but control type doesn't
                 // meet the constraints.  Ignore input.
@@ -463,7 +462,7 @@ public class ControllerConfigurator
                 }
             }
 
-            if (event.sourceControl.controlType == NiceControlType.DISCRETE_INPUT)
+            if (event.sourceControl.getControlType() == NiceControlType.DISCRETE_INPUT)
             {
                 if (!boundsHit)
                 {
@@ -486,7 +485,7 @@ public class ControllerConfigurator
                     }
                 }
             }
-            else if (event.sourceControl.controlType == NiceControlType.CONTINUOUS_INPUT)
+            else if (event.sourceControl.getControlType() == NiceControlType.CONTINUOUS_INPUT)
             {
                 if (event.sourceControl.getIdentifier() == Identifier.Axis.POV)
                 {
@@ -557,7 +556,7 @@ public class ControllerConfigurator
             else
             {
                 throw new RuntimeException("Unsupported control type: "
-                        + event.sourceControl.controlType);
+                        + event.sourceControl.getControlType());
             }
 
             // If a winner has been declared, notify any listeners that are
@@ -596,6 +595,8 @@ public class ControllerConfigurator
          * Whether or not calibration is running.
          */
         private volatile boolean running = false;
+
+        private volatile ControllerConfiguration originalConfiguration = null;
 
         /**
          * Constructs a new calibration listener.
@@ -642,6 +643,11 @@ public class ControllerConfigurator
         final void start()
         {
             running = true;
+            controller.getConfigurationLive().lockConfiguration();
+            // Make copy of existing configuration to restore.
+            originalConfiguration = new ControllerConfiguration(
+                    controller.getConfigurationLive());
+            controller.applyConfiguration(config);
         }
 
         /**
@@ -649,6 +655,10 @@ public class ControllerConfigurator
          */
         final void stop()
         {
+            // Restore original configuration
+            controller.applyConfiguration(originalConfiguration);
+            // Unlock configuration now that it has been restored
+            controller.getConfigurationLive().unlockConfiguration(true);
             running = false;
         }
     }
