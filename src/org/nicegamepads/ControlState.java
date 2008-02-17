@@ -23,6 +23,11 @@ final class ControlState
     float currentValue = 0f;
 
     /**
+     * Raw current value before any configuration-driven changes.
+     */
+    float rawCurrentValue = 0f;
+
+    /**
      * The timestamp at which the last polling was completed.
      */
     long lastTimestamp = -1L;

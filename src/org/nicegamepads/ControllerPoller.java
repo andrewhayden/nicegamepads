@@ -296,10 +296,14 @@ final class ControllerPoller
         controllerState.timestamp = now;
 
         // Poll the controller
-        boolean controllerOk = config.getController().poll();
-        if (!controllerOk)
+        try
+        {
+            config.getController().pollAllControls(controllerState);
+        }
+        catch(ControllerException e)
         {
             // FIXME: raise event!
+            e.printStackTrace();
             stopPolling();
         }
 
@@ -309,7 +313,7 @@ final class ControllerPoller
             // Look up configuration for this control
             controlConfig = config.getConfiguration(state.control);
             // Poll the value
-            float polledValue = state.control.getPollData();
+            float polledValue = state.rawCurrentValue;
             // Transform according to configuration rules
             polledValue = transform(
                     polledValue, controlConfig, state.control.getControlType());

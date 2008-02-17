@@ -91,6 +91,11 @@ public final class NiceController
     private ControllerConfiguration cachedConfig = null;
 
     /**
+     * Mutex for polling.
+     */
+    private final Object pollingLock = new Object();
+
+    /**
      * Returns the wrapper for the specified controller; there is exactly
      * one wrapper per physical device, and no more.
      * 
@@ -679,5 +684,38 @@ public final class NiceController
     public final void applyConfiguration(ControllerConfiguration newConfig)
     {
         config.loadFrom(newConfig);
+    }
+
+    /**
+     * Polls all controls for the latest information immediately, and places
+     * the information into the specified state object.
+     * 
+     * @param state the state to place the polled values into
+     * @throws ControllerException if the controller fails to poll
+     * successfully; this usually indicates that the controller has been
+     * disconnected or has stopped functioning.
+     */
+    final void pollAllControls(ControllerState state)
+    throws ControllerException
+    {
+        // Only allow one polling event to occur at any time as we do not
+        // know how the hardware could react if we made two overlapping
+        // requests.  This is a safety precaution.
+        synchronized(pollingLock)
+        {
+            boolean ok = jinputController.poll();
+            long pollingTime = System.currentTimeMillis();
+            if (ok)
+            {
+                for (NiceControl control : getControls())
+                {
+                    control.poll(state.getControlState(control), pollingTime);
+                }
+            }
+            else
+            {
+                throw new ControllerException("Controller polling has failed.");
+            }
+        }
     }
 }
