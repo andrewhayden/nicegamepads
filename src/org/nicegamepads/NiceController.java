@@ -68,12 +68,50 @@ public final class NiceController
     /**
      * Fingerprint for this kind of controller.
      */
-    private int fingerprint = 0;
+    private volatile int fingerprint = 0;
 
     /**
      * Whether or not this is a gamepad-like controller.
      */
-    private Boolean gamepadLike = null;
+    private volatile boolean gamepadLike = false;
+
+    /**
+     * The configuration for this controller.
+     */
+    private ControllerConfiguration config = null;
+
+    /**
+     * Modification counter for the configuration.
+     */
+    private int configModificationCounter = 0;
+
+    /**
+     * Cached copy of the controller configuration.
+     */
+    private ControllerConfiguration cachedConfig = null;
+
+    /**
+     * Returns the wrapper for the specified controller; there is exactly
+     * one wrapper per physical device, and no more.
+     * 
+     * @param controller the device to be wrapped
+     * @return the singleton wrapper for the physical device
+     */
+    final static NiceController getInstance(Controller controller)
+    {
+        synchronized(wrappersByJinputController)
+        {
+            NiceController instance =
+                wrappersByJinputController.get(controller);
+            if (instance == null)
+            {
+                instance = new NiceController(controller);
+                instance.init();
+                wrappersByJinputController.put(controller, instance);
+            }
+            return instance;
+        }
+    }
 
     /**
      * Constructs a new wrapper for the specific controller.
@@ -89,13 +127,26 @@ public final class NiceController
         this.jinputController = jinputController;
     }
 
+    /**
+     * Must be called after the constructor in order to properly configure
+     * the controller with configuration information and caching of controls.
+     */
+    private final void init()
+    {
+        List<NiceControl> discoveredControls = new ArrayList<NiceControl>();
+        getControlsHelper(this.jinputController, discoveredControls);
+        cachedControlsByController.put(this,
+                Collections.unmodifiableList(discoveredControls));
+        fingerprint = generateFingerprint();
+        gamepadLike = isGamepadLikeInternal();
+        config = new ControllerConfiguration(this);
+        loadDeadZoneDefaults();
+        cachedConfig = new ControllerConfiguration(config);
+        configModificationCounter = config.getModificationCount();
+    }
+
     public final int getFingerprint()
     {
-        // Lazily cache
-        if (fingerprint == 0)
-        {
-            this.fingerprint = generateFingerprint();
-        }
         return fingerprint;
     }
 
@@ -144,17 +195,7 @@ public final class NiceController
      */
     public final List<NiceControl> getControls()
     {
-        List<NiceControl> results = null;
-        results = cachedControlsByController.get(this);
-        if (results == null)
-        {
-            // Calculate and cache.
-            results = new ArrayList<NiceControl>();
-            getControlsHelper(this.jinputController, results);
-            results = Collections.unmodifiableList(results);
-            cachedControlsByController.put(this, results);
-        }
-        return results;
+        return cachedControlsByController.get(this);
     }
 
     /**
@@ -356,89 +397,7 @@ public final class NiceController
      */
     public final boolean isGamepadLike()
     {
-        if (gamepadLike == null)
-        {
-            gamepadLike = isGamepadLikeInternal();
-        }
-
-        return gamepadLike.booleanValue();
-    }
-
-    /**
-     * Load the default dead zones for the controller's controls.
-     * 
-     * @param controller the controller to load defaults for
-     */
-    public final void loadDeadZoneDefaults()
-    {
-        for (NiceControl control : getControls())
-        {
-            control.loadDeadZoneDefaults();
-        }
-    }
-
-    /**
-     * Sets the specified dead zones for the controller's analog controls.
-     * <p>
-     * This is useful for hyper-sensitive controllers that don't report
-     * reasonable dead zones.  A small range such as
-     * <code>[-0.05f, 0.05f]</code> (that is, 5% of the total range)
-     * is usually a good choice, as it will generally compensate for random
-     * jitter without making the device feel unresponsive.  Different
-     * controllers may vary significantly in this regard, however, so some
-     * experimentation may be necessary.
-     * <p>
-     * Note that the bounds are constrained by the requirements set forth
-     * in {@link ControlConfiguration#setDeadZoneBounds(float, float)}.
-     * <p>
-     * This method is equivalent to finding all analog controls in
-     * a controller and invoking
-     * {@link ControlConfiguration#setDeadZoneBounds(float, float)}
-     * for each such control.
-     */
-    public final void setAnalogDeadZones(float lowerBound, float upperBound)
-    {
-        List<NiceControl> eligibleControls =
-            getControlsByType(NiceControlType.CONTINUOUS_INPUT);
-        for (NiceControl control : eligibleControls)
-        {
-            control.getConfig().setDeadZoneBounds(
-                        lowerBound, upperBound);
-        }
-    }
-
-    /**
-     * Sets the specified granularity for the controller's analog controls.
-     * <p>
-     * This is useful for sensitive controllers that provide more values
-     * than your application can reasonably make use of, and as a result
-     * flood the system with value-changed events that are of little or
-     * no real consequence (e.g., value change from 0.0001 to 0.0002).
-     * Generally, even a small granularity such as 0.2 will greatly
-     * reduce the number of spurious value-changed events encountered.  For
-     * example, a granularity of 0.2 splits the logical range of an analog
-     * control into 10 logical "buckets", 5 on each side of 0 (e.g.,
-     * left and right each have 5 "buckets").
-     * <p>
-     * Different controllers may vary significantly in this regard, so some
-     * experimentation may be necessary.
-     * <p>
-     * Note that the values are constrained by the requirements set forth
-     * in {@link ControlConfiguration#setGranularity(float)}.
-     * <p>
-     * This method is equivalent to finding all analog controls in
-     * a controller and invoking
-     * {@link ControlConfiguration#setGranularity(float)}
-     * for each such control.
-     */
-    public final void setAnalogGranularities(float granularity)
-    {
-        List<NiceControl> eligibleControls =
-            getControlsByType(NiceControlType.CONTINUOUS_INPUT);
-        for (NiceControl control : eligibleControls)
-        {
-            control.getConfig().setGranularity(granularity);
-        }
+        return gamepadLike;
     }
 
     /**
@@ -473,27 +432,6 @@ public final class NiceController
     // ========================================================================
     // Static helper methods
     // ========================================================================
-
-    /**
-     * Returns the wrapper for the specified controller; there is exactly
-     * one wrapper per physical device, and no more.
-     * 
-     * @param controller the device to be wrapped
-     * @return the singleton wrapper for the physical device
-     */
-    final static NiceController getInstance(Controller controller)
-    {
-        synchronized(wrappersByJinputController)
-        {
-            NiceController instance = wrappersByJinputController.get(controller);
-            if (instance == null)
-            {
-                instance = new NiceController(controller);
-                wrappersByJinputController.put(controller, instance);
-            }
-            return instance;
-        }
-    }
 
     /**
      * Returns a list of all controllers regardless of their type.
@@ -555,5 +493,168 @@ public final class NiceController
             return allGamepads.get(0);
         }
         return null;
+    }
+
+    /**
+     * Returns an independent, mutable copy of the configuration for this
+     * controller.
+     * <p>
+     * The returned copy is completely independent of the original.  It can
+     * be modified, but modifications will not affect this controller.
+     * <p>
+     * This method should <strong>only</strong> be used to obtain a
+     * <strong>mutable copy</strong> of the configuration.  If you do
+     * <em>not</em> need a mutable copy, you should call
+     * {@link #getConfigurationCached()} instead, which
+     * efficiently caches the configuration until it is changed and
+     * can be called as often as necessary with little overhead.
+     * 
+     * @return an independent and mutable copy of the configuration for
+     * the controller
+     * @see #getConfigurationLive()
+     * @see #getConfigurationCached()
+     */
+    public final ControllerConfiguration getConfigurationCopy()
+    {
+        return new ControllerConfiguration(config);
+    }
+
+    /**
+     * Returns the live copy of the configuration for this controller,
+     * which can be used to make changes immediately.
+     * <p>
+     * The returned configuration is live.  Changes made to this object
+     * take effect immediately and are visible to all threads.
+     * 
+     * @return the live copy of the configuration for the controller
+     * @see #getConfigurationCopy()
+     * @see #getConfigurationCached()
+     */
+    public final ControllerConfiguration getConfigurationLive()
+    {
+        return new ControllerConfiguration(config);
+    }
+
+    /**
+     * Returns an independent, cached copy of the configuration for this
+     * controller.
+     * <p>
+     * The returned copy is completely independent of the original.  Although
+     * it can be modified, it is generally an error to do so as the copy is
+     * regenerated as often as necessary and thus all changes may be lost
+     * at any time.  Any such modifications will not affect this controller
+     * in any case.
+     * <p>
+     * This method is preferable to {@link #getConfigurationCopy()} as it
+     * does not create a new configuration object every time.  As long as
+     * you intend only to read the returned configuration, use this method.
+     * 
+     * @return an independent cached copy of the configuration for
+     * the controller
+     * @see #getConfigurationCopy()
+     * @see #getConfigurationLive()
+     */
+    public final ControllerConfiguration getConfigurationCached()
+    {
+        config.lockConfiguration();
+        if (configModificationCounter != config.getModificationCount())
+        {
+            cachedConfig = new ControllerConfiguration(config);
+            configModificationCounter = config.getModificationCount();
+        }
+        config.unlockConfiguration();
+        return cachedConfig;
+    }
+
+    /**
+     * Convenience method to set the specified dead zones for all of the
+     * controller's analog controls.
+     * <p>
+     * This is useful for hyper-sensitive controllers that don't report
+     * reasonable dead zones.  A small range such as
+     * <code>[-0.05f, 0.05f]</code> (that is, 5% of the total range)
+     * is usually a good choice, as it will generally compensate for random
+     * jitter without making the device feel unresponsive.  Different
+     * controllers may vary significantly in this regard, however, so some
+     * experimentation may be necessary.
+     * <p>
+     * Note that the bounds are constrained by the requirements set forth
+     * in {@link ControlConfiguration#setDeadZoneBounds(float, float)}.
+     * <p>
+     * This method is equivalent to finding all analog controls in
+     * a controller and invoking
+     * {@link ControlConfiguration#setDeadZoneBounds(float, float)}
+     * for each such control.
+     * 
+     * @param lowerBound see
+     * {@link ControlConfiguration#setDeadZoneBounds(float, float)
+     * @param upperBound see
+     * {@link ControlConfiguration#setDeadZoneBounds(float, float)
+     */
+    public final void setAllAnalogDeadZones(float lowerBound, float upperBound)
+    {
+        List<NiceControl> eligibleControls =
+            getControlsByType(NiceControlType.CONTINUOUS_INPUT);
+        config.lockConfiguration();
+        for (NiceControl control : eligibleControls)
+        {
+            config.getConfiguration(control).setDeadZoneBounds(
+                        lowerBound, upperBound);
+        }
+        config.unlockConfiguration();
+    }
+
+    /**
+     * Convenience method to set the specified granularity for all of the
+     * controller's analog controls.
+     * <p>
+     * This is useful for sensitive controllers that provide more values
+     * than your application can reasonably make use of, and as a result
+     * flood the system with value-changed events that are of little or
+     * no real consequence (e.g., value change from 0.0001 to 0.0002).
+     * Generally, even a small granularity such as 0.2 will greatly
+     * reduce the number of spurious value-changed events encountered.  For
+     * example, a granularity of 0.2 splits the logical range of an analog
+     * control into 10 logical "buckets", 5 on each side of 0 (e.g.,
+     * left and right each have 5 "buckets").
+     * <p>
+     * Different controllers may vary significantly in this regard, so some
+     * experimentation may be necessary.
+     * <p>
+     * Note that the values are constrained by the requirements set forth
+     * in {@link ControlConfiguration#setGranularity(float)}.
+     * <p>
+     * This method is equivalent to finding all analog controls in
+     * a controller and invoking
+     * {@link ControlConfiguration#setGranularity(float)}
+     * for each such control.
+     * 
+     * @param granularity see
+     * {@link ControlConfiguration#setGranularity(float)}
+     */
+    public final void setAllAnalogGranularities(float granularity)
+    {
+        List<NiceControl> eligibleControls =
+            getControlsByType(NiceControlType.CONTINUOUS_INPUT);
+        config.lockConfiguration();
+        for (NiceControl control : eligibleControls)
+        {
+            config.getConfiguration(control).setGranularity(granularity);
+        }
+        config.unlockConfiguration();
+    }
+
+    /**
+     * Convenience method to (re)load the default dead zones for all of the
+     * controller's controls.
+     */
+    public final void loadDeadZoneDefaults()
+    {
+        config.lockConfiguration();
+        for (NiceControl control : getControls())
+        {
+            control.loadDeadZoneDefaults();
+        }
+        config.unlockConfiguration();
     }
 }

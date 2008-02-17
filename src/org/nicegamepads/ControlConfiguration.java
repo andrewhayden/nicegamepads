@@ -10,7 +10,7 @@ import java.util.TreeSet;
 /**
  * Logical configuration for a single component.
  * <p>
- * This class is <em>not</em> threadsafe.
+ * This class is threadsafe.
  * <p>
  * <h2>Inversion, Granularity, Dead Zone and Center Values</h2>
  * This class allows you to specify the four properties listed above.
@@ -80,7 +80,7 @@ import java.util.TreeSet;
  * 
  * @author Andrew Hayden
  */
-public class ControlConfiguration implements Cloneable
+public class ControlConfiguration
 {
     /**
      * The lower bound of the dead zone, if any (inclusive).
@@ -131,11 +131,25 @@ public class ControlConfiguration implements Cloneable
     int userDefinedId = Integer.MIN_VALUE;
 
     /**
+     * The configuration container for the controller.
+     */
+    final ControllerConfiguration parent;
+
+    /**
+     * The control whose configuration this is.
+     */
+    final NiceControl control;
+
+    /**
      * Creates a new, empty configuration with default values.
      */
-    ControlConfiguration()
+    ControlConfiguration(ControllerConfiguration parent, NiceControl control)
     {
+        parent.lockConfiguration();
+        this.parent = parent;
+        this.control = control;
         valueIdsByValue = new HashMap<Float, Integer>();
+        parent.unlockConfiguration();
     }
 
     /**
@@ -146,6 +160,9 @@ public class ControlConfiguration implements Cloneable
      */
     ControlConfiguration(ControlConfiguration source)
     {
+        source.parent.lockConfiguration();
+        parent = source.parent;
+        control = source.control;
         userDefinedId = source.userDefinedId;
         deadZoneLowerBound = source.deadZoneLowerBound;
         deadZoneUpperBound = source.deadZoneUpperBound;
@@ -154,27 +171,34 @@ public class ControlConfiguration implements Cloneable
         isTurboEnabled = source.isTurboEnabled;
         centerValueOverride = source.centerValueOverride;
         valueIdsByValue = new HashMap<Float, Integer>(source.valueIdsByValue);
+        source.parent.unlockConfiguration();
     }
 
-    /* (non-Javadoc)
-     * @see java.lang.Object#clone()
+    /**
+     * Loads all the settings from the specified configuration into this
+     * configuration.  This method can be used to copy settings between
+     * different controls and even between different controls on different
+     * control<em>lers</em>.
+     * 
+     * @param other the source object to copy settings from
      */
-    @Override
-    protected ControlConfiguration clone()
-    throws CloneNotSupportedException
+    public void loadFrom(ControlConfiguration other)
     {
-        super.clone();
-        ControlConfiguration clone = new ControlConfiguration();
-        clone.userDefinedId = userDefinedId;
-        clone.deadZoneLowerBound = deadZoneLowerBound;
-        clone.deadZoneUpperBound = deadZoneUpperBound;
-        clone.granularity = granularity;
-        clone.isInverted = isInverted;
-        clone.isTurboEnabled = isTurboEnabled;
-        clone.centerValueOverride = centerValueOverride;
-        clone.valueIdsByValue.putAll(
-                valueIdsByValue);
-        return clone;
+        // Must construct a copy to ensure thread safety while avoiding
+        // deadlock; otherwise we'd have to acquire both the sources' lock
+        // and our own to do this safely.
+        ControlConfiguration source = new ControlConfiguration(other);
+        parent.lockConfiguration();
+        userDefinedId = source.userDefinedId;
+        deadZoneLowerBound = source.deadZoneLowerBound;
+        deadZoneUpperBound = source.deadZoneUpperBound;
+        granularity = source.granularity;
+        isInverted = source.isInverted;
+        isTurboEnabled = source.isTurboEnabled;
+        centerValueOverride = source.centerValueOverride;
+        valueIdsByValue.clear();
+        valueIdsByValue.putAll(source.valueIdsByValue);
+        parent.unlockConfiguration(true);
     }
 
     /**
@@ -196,6 +220,7 @@ public class ControlConfiguration implements Cloneable
     final Map<String, String> saveToProperties(
             String prefix, Map<String,String> destination)
     {
+        parent.lockConfiguration();
         if (destination == null)
         {
             destination = new HashMap<String, String>();
@@ -233,7 +258,7 @@ public class ControlConfiguration implements Cloneable
         }
         destination.put(prefix + ".userDefinedSymbolKeysList",
                 buffer.toString());
-
+        parent.unlockConfiguration();
         return destination;
     }
 
@@ -250,6 +275,7 @@ public class ControlConfiguration implements Cloneable
     final void loadFromProperties(String prefix, Map<String, String> source)
     throws ConfigurationException
     {
+        parent.lockConfiguration();
         userDefinedId = ConfigurationUtils.getInteger(
                 source, prefix + ".userDefinedId");
         centerValueOverride = ConfigurationUtils.getFloat(
@@ -287,6 +313,7 @@ public class ControlConfiguration implements Cloneable
                 valueIdsByValue.put(trueKey, trueValue);
             }
         }
+        parent.unlockConfiguration(true);
     }
 
     /**
@@ -298,12 +325,14 @@ public class ControlConfiguration implements Cloneable
      */
     public final float[] getAllValuesWithIds()
     {
+        parent.lockConfiguration();
         float[] values = new float[valueIdsByValue.size()];
         int counter = 0;
         for (float f : valueIdsByValue.keySet())
         {
             values[counter++] = f;
         }
+        parent.unlockConfiguration();
         return values;
     }
 
@@ -319,6 +348,7 @@ public class ControlConfiguration implements Cloneable
      */
     public final int[] getAllValueIds()
     {
+        parent.lockConfiguration();
         Set<Integer> asSet = new HashSet<Integer>(valueIdsByValue.values());
         int[] ids = new int[asSet.size()];
         int counter = 0;
@@ -326,6 +356,7 @@ public class ControlConfiguration implements Cloneable
         {
             ids[counter++] = i;
         }
+        parent.unlockConfiguration();
         return ids;
     }
 
@@ -343,15 +374,19 @@ public class ControlConfiguration implements Cloneable
      */
     public final int getValueId(float value)
     {
-        Integer result = valueIdsByValue.get(value);
-        if (result == null)
+        parent.lockConfiguration();
+        Integer storedValue = valueIdsByValue.get(value);
+        int result;
+        if (storedValue == null)
         {
-            return Integer.MIN_VALUE;
+            result = Integer.MIN_VALUE;
         }
         else
         {
-            return result;
+            result = storedValue.intValue();
         }
+        parent.unlockConfiguration();
+        return result;
     }
 
     /**
@@ -404,7 +439,14 @@ public class ControlConfiguration implements Cloneable
                     + "cannot be bound.");
         }
 
-        valueIdsByValue.put(value, id);
+        parent.lockConfiguration();
+        Integer oldId = valueIdsByValue.get(value);
+        boolean changed = (oldId != null && oldId.intValue() != id);
+        if (changed)
+        {
+            valueIdsByValue.put(value, id);
+        }
+        parent.unlockConfiguration(changed);
     }
 
     /**
@@ -415,7 +457,10 @@ public class ControlConfiguration implements Cloneable
      */
     public final float getDeadZoneLowerBound()
     {
-        return deadZoneLowerBound;
+        parent.lockConfiguration();
+        float result = deadZoneLowerBound;
+        parent.unlockConfiguration();
+        return result;
     }
 
     /**
@@ -426,7 +471,10 @@ public class ControlConfiguration implements Cloneable
      */
     public final float getDeadZoneUpperBound()
     {
-        return deadZoneUpperBound;
+        parent.lockConfiguration();
+        float result = deadZoneUpperBound;
+        parent.unlockConfiguration();
+        return result;
     }
 
     /**
@@ -504,23 +552,14 @@ public class ControlConfiguration implements Cloneable
                     + "must be set or cleared together.");
         }
 
-        // Set bounds to NaN so that this method cannot cause a logical
-        // error if the new lower bound is greater than the old upper bound,
-        // or if the new upper bound is less than the old lower bound.
-        // This is necessary because we aren't synchronizing here, so we
-        // have to make certain we cannot cause an unexpected condition in
-        // downstream code.
-        deadZoneLowerBound = Float.NaN;
-        deadZoneUpperBound = Float.NaN;
+        parent.lockConfiguration();
+        boolean changed = (this.deadZoneLowerBound != lowerBoundResult)
+            || (this.deadZoneUpperBound != upperBoundResult);
 
         // Set new lower and upper bounds.
-        // Although this is not atomic, the bounds will always be logically
-        // valid.  There is a brief window of opportunity during which the
-        // lower bound could be read before the upper bound, but this
-        // should generally not be a problem since the bounds will always be
-        // in a valid (but perhaps incorrect) state
         deadZoneLowerBound = lowerBoundResult;
         deadZoneUpperBound = upperBoundResult;
+        parent.unlockConfiguration(changed);
     }
 
     /**
@@ -531,7 +570,10 @@ public class ControlConfiguration implements Cloneable
      */
     public final float getCenterValueOverride()
     {
-        return centerValueOverride;
+        parent.lockConfiguration();
+        float result = centerValueOverride;
+        parent.unlockConfiguration();
+        return result;
     }
 
     /**
@@ -565,7 +607,10 @@ public class ControlConfiguration implements Cloneable
                         + centerValueOverride);
             }
         }
+        parent.lockConfiguration();
+        boolean changed = this.centerValueOverride != centerValueOverride;
         this.centerValueOverride = centerValueOverride;
+        parent.unlockConfiguration(changed);
     }
 
     /**
@@ -577,7 +622,10 @@ public class ControlConfiguration implements Cloneable
      */
     public final float getGranularity()
     {
-        return granularity;
+        parent.lockConfiguration();
+        float result = granularity;
+        parent.unlockConfiguration();
+        return result;
     }
 
     /**
@@ -641,7 +689,10 @@ public class ControlConfiguration implements Cloneable
                         + granularity);
             }
         }
+        parent.lockConfiguration();
+        boolean changed = granularity != this.granularity;
         this.granularity = granularity;
+        parent.unlockConfiguration(changed);
     }
 
     /**
@@ -652,7 +703,10 @@ public class ControlConfiguration implements Cloneable
      */
     public final boolean isInverted()
     {
-        return isInverted;
+        parent.lockConfiguration();
+        boolean result = isInverted;
+        parent.unlockConfiguration();
+        return result;
     }
 
     /**
@@ -676,7 +730,10 @@ public class ControlConfiguration implements Cloneable
      */
     public void setInverted(boolean isInverted)
     {
+        parent.lockConfiguration();
+        boolean changed = this.isInverted != isInverted;
         this.isInverted = isInverted;
+        parent.unlockConfiguration(changed);
     }
 
     /**
@@ -687,7 +744,9 @@ public class ControlConfiguration implements Cloneable
      */
     public final boolean isTurboEnabled()
     {
-        return isTurboEnabled;
+        parent.lockConfiguration();
+        boolean result = isTurboEnabled;
+        return result;
     }
 
     /**
@@ -724,7 +783,10 @@ public class ControlConfiguration implements Cloneable
      */
     public void setTurboEnabled(boolean isTurboEnabled)
     {
+        parent.lockConfiguration();
+        boolean changed = this.isTurboEnabled != isTurboEnabled;
         this.isTurboEnabled = isTurboEnabled;
+        parent.unlockConfiguration(changed);
     }
 
     /**
@@ -740,7 +802,10 @@ public class ControlConfiguration implements Cloneable
      */
     public final long getTurboDelayMillis()
     {
-        return turboDelayMillis;
+        parent.lockConfiguration();
+        long result = turboDelayMillis;
+        parent.unlockConfiguration();
+        return result;
     }
 
     /**
@@ -785,7 +850,10 @@ public class ControlConfiguration implements Cloneable
      */
     public void setTurboDelayMillis(long turboDelayMillis)
     {
+        parent.lockConfiguration();
+        boolean changed = this.turboDelayMillis != turboDelayMillis;
         this.turboDelayMillis = turboDelayMillis;
+        parent.unlockConfiguration(changed);
     }
 
     /**
@@ -799,7 +867,10 @@ public class ControlConfiguration implements Cloneable
      */
     public final int getUserDefinedId()
     {
-        return userDefinedId;
+        parent.lockConfiguration();
+        int result = userDefinedId;
+        parent.unlockConfiguration();
+        return result;
     }
 
     /**
@@ -835,24 +906,16 @@ public class ControlConfiguration implements Cloneable
      */
     public void setUserDefinedId(int userDefinedId)
     {
+        parent.lockConfiguration();
+        boolean changed = this.userDefinedId != userDefinedId;
         this.userDefinedId = userDefinedId;
-    }
-
-    /**
-     * Not for public use.
-     * <p>
-     * Returns a reference to the live map of values.
-     * 
-     * @return a reference to the live map
-     */
-    final Map<Float, Integer> getValueIdsByValue()
-    {
-        return valueIdsByValue;
+        parent.unlockConfiguration(changed);
     }
 
     @Override
     public String toString()
     {
+        parent.lockConfiguration();
         StringBuilder buffer = new StringBuilder();
         buffer.append(ControlConfiguration.class.getName());
         buffer.append(": [");
@@ -888,6 +951,7 @@ public class ControlConfiguration implements Cloneable
         }
         buffer.append("]");
         buffer.append("]");
+        parent.unlockConfiguration();
         return buffer.toString();
     }
 }

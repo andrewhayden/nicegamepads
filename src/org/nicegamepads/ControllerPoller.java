@@ -16,7 +16,7 @@ import java.util.concurrent.TimeoutException;
  * 
  * @author Andrew Hayden
  */
-public class ControllerPoller
+final class ControllerPoller
 {
     /**
      * The controller state used to store the state of the controller and
@@ -81,10 +81,10 @@ public class ControllerPoller
      * @param deep whether or not to descend recursively into any and all
      * subcontrollers or not
      */
-    public ControllerPoller(ControllerConfiguration configuration)
+    ControllerPoller(ControllerConfiguration configuration)
     {
         volatileConfiguration =
-            ConfigurationUtils.immutableControllerConfiguration(configuration);
+            configuration.getController().getConfigurationCached();
         this.controllerState = new ControllerState(volatileConfiguration);
         pollingInvoker = new PollingInvoker(this);
     }
@@ -93,7 +93,7 @@ public class ControllerPoller
      * Requests that <strong>all</strong> polling cease in the near future.
      * Events that are currently enqueued are allowed to start and complete.
      */
-    public final static void shutdownAllPolling()
+    final static void shutdownAllPolling()
     {
         ControllerManager.getPollingService().shutdown();
     }
@@ -103,7 +103,7 @@ public class ControllerPoller
      * All currently-executing events are asked to halt (via interrupt)
      * and all enqueued events are dropped on the floor.
      */
-    public final static void shutdownAllPollingNow()
+    final static void shutdownAllPollingNow()
     {
         ControllerManager.getPollingService().shutdownNow();
     }
@@ -117,7 +117,7 @@ public class ControllerPoller
      * returns; otherwise, <code>false</code> if the timeout expires first
      * @throws InterruptedException if interrupted while waiting
      */
-    public final static boolean awaitTermination(long timeout, TimeUnit unit)
+    final static boolean awaitTermination(long timeout, TimeUnit unit)
     throws InterruptedException
     {
         return ControllerManager.getPollingService().awaitTermination(timeout, unit);
@@ -187,7 +187,7 @@ public class ControllerPoller
      * 
      * @return an immutable version of the current configuration
      */
-    public final ControllerConfiguration getImmutableConfiguration()
+    final ControllerConfiguration getImmutableConfiguration()
     {
         return volatileConfiguration;
     }
@@ -197,7 +197,7 @@ public class ControllerPoller
      * 
      * @return the controller that this poller polls for
      */
-    public final NiceController getController()
+    final NiceController getController()
     {
         return volatileConfiguration.getController();
     }
@@ -211,7 +211,7 @@ public class ControllerPoller
      * 
      * @return
      */
-    public final ControllerConfiguration getConfiguration()
+    final ControllerConfiguration getConfiguration()
     {
         return new ControllerConfiguration(volatileConfiguration);
     }
@@ -220,7 +220,7 @@ public class ControllerPoller
      * Sets a new configuration which will be used for the next polling
      * operation.
      * <p>
-     * An independent copy of the speciifed configuration is made and used
+     * An independent copy of the specified configuration is made and used
      * for all polling operations that begin after this method completes.
      * <p>
      * This method is threadsafe.
@@ -232,7 +232,7 @@ public class ControllerPoller
      * @throws RuntimeException if an attempt is made to set a configuration
      * that refers to a different controller than the previous configuration
      */
-    public final void setConfiguration(ControllerConfiguration configuration)
+    final void setConfiguration(ControllerConfiguration configuration)
     {
         if (configuration == null)
         {
@@ -250,8 +250,7 @@ public class ControllerPoller
 
         // We will store an immutable reference as we should never, EVER
         // change the configuration ourselves.
-        this.volatileConfiguration =
-            ConfigurationUtils.immutableControllerConfiguration(configuration);
+        this.volatileConfiguration = configuration;
     }
 
     /**
@@ -266,7 +265,7 @@ public class ControllerPoller
      * @param interval the interval at which to poll
      * @param unit the time unit for the interval
      */
-    public final void startPolling(long interval, TimeUnit unit)
+    final void startPolling(long interval, TimeUnit unit)
     {
         synchronized(pollingInvoker)
         {
@@ -288,7 +287,7 @@ public class ControllerPoller
      * to guarantee that polling has terminated by the time this call
      * returns, use {@link #stopPollingAndWait(long, TimeUnit)} instead.
      */
-    public final void stopPolling()
+    final void stopPolling()
     {
         synchronized(pollingInvoker)
         {
@@ -307,7 +306,7 @@ public class ControllerPoller
      * polling events will be enqueued for dispatch (any unprocessed
      * events will still be fired).
      */
-    public final void stopPollingAndWait(long interval, TimeUnit unit)
+    final void stopPollingAndWait(long interval, TimeUnit unit)
     throws InterruptedException, ExecutionException, TimeoutException
     {
         synchronized(pollingInvoker)
@@ -608,7 +607,7 @@ public class ControllerPoller
      * 
      * @param listener the listener to add.
      */
-    public final void addControlActivationListener(
+    final void addControlActivationListener(
             ControlActivationListener listener)
     {
         activationListeners.add(listener);
@@ -619,7 +618,7 @@ public class ControllerPoller
      * 
      * @param listener the listener to be removed
      */
-    public final void removeControlActivationListener(
+    final void removeControlActivationListener(
             ControlActivationListener listener)
     {
         activationListeners.remove(listener);
@@ -643,7 +642,7 @@ public class ControllerPoller
      * 
      * @param listener the listener to add.
      */
-    public final void addControlChangeListener(
+    final void addControlChangeListener(
             ControlChangeListener listener)
     {
         changeListeners.add(listener);
@@ -654,7 +653,7 @@ public class ControllerPoller
      * 
      * @param listener the listener to be removed
      */
-    public final void removeControlChangeListener(
+    final void removeControlChangeListener(
             ControlChangeListener listener)
     {
         changeListeners.remove(listener);
@@ -678,7 +677,7 @@ public class ControllerPoller
      * 
      * @param listener the listener to add.
      */
-    public final void addControlPollingListener(
+    final void addControlPollingListener(
             ControlPollingListener listener)
     {
         controlPollingListeners.add(listener);
@@ -689,7 +688,7 @@ public class ControllerPoller
      * 
      * @param listener the listener to be removed
      */
-    public final void removeControlPollingListener(
+    final void removeControlPollingListener(
             ControlPollingListener listener)
     {
         controlPollingListeners.remove(listener);
@@ -713,7 +712,7 @@ public class ControllerPoller
      * 
      * @param listener the listener to add.
      */
-    public final void addControllerPollingListener(
+    final void addControllerPollingListener(
             ControllerPollingListener listener)
     {
         controllerPollingListeners.add(listener);
@@ -724,7 +723,7 @@ public class ControllerPoller
      * 
      * @param listener the listener to be removed
      */
-    public final void removeControllerPollingListener(
+    final void removeControllerPollingListener(
             ControllerPollingListener listener)
     {
         controllerPollingListeners.remove(listener);

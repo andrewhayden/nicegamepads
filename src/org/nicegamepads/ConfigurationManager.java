@@ -15,7 +15,7 @@ import java.util.Properties;
  * 
  * @author Andrew Hayden
  */
-public final class ConfigurationManager
+final class ConfigurationManager
 {
     /**
      * Standard prefix used for saving configurations.
@@ -24,34 +24,12 @@ public final class ConfigurationManager
         "org.nicegamepads.ConfigurationManager";
 
     /**
-     * Map of controller object keys to configuration values.
-     * <p>
-     * The controller objects do not persist across reconnects of the
-     * physical device. 
-     */
-    private final static Map<NiceController, ControllerConfiguration>
-        configurationsByController =
-            new HashMap<NiceController, ControllerConfiguration>();
-
-    /**
-     * Lazy cache of immutable configuration objects for controllers.
-     */
-    private final static Map<NiceController, ControllerConfiguration>
-        cachedImmutableconfigurationsByController =
-            new HashMap<NiceController, ControllerConfiguration>();
-
-    /**
-     * Synchronization lock.
-     */
-    private final static Object configurationLock = new Object();
-
-    /**
      * Default location for storing configuration files.
      * <p>
      * The default value is ".controller-configs", which is interpreted as a
      * relative path to the current working directory.
      */
-    public final static String DEFAULT_CONFIG_PATH = ".controller-configs/";
+    final static String DEFAULT_CONFIG_PATH = ".controller-configs/";
 
     /**
      * Key under which the {@link #DEFAULT_CONFIG_PATH} may be overridden by
@@ -59,7 +37,7 @@ public final class ConfigurationManager
      * path will cause the system to save and load configurations from that
      * path instead of {@link #DEFAULT_CONFIG_PATH}.
      */
-    public final static String CONFIG_PATH_PROPERTY =
+    final static String CONFIG_PATH_PROPERTY =
         "org.nicegamepads.ConfigurationManager.configPath";
 
     /**
@@ -71,7 +49,7 @@ public final class ConfigurationManager
      * 
      * @see #MINOR_VERSION
      */
-    public final static int MAJOR_VERSION = 0;
+    final static int MAJOR_VERSION = 0;
 
     /**
      * Minor version of this class.  Configurations saved by different minor
@@ -82,7 +60,7 @@ public final class ConfigurationManager
      * 
      * @see #MAJOR_VERSION
      */
-    public final static int MINOR_VERSION = 1;
+    final static int MINOR_VERSION = 1;
 
     /**
      * Private constructor discourages unwanted instantiation.
@@ -90,135 +68,6 @@ public final class ConfigurationManager
     private ConfigurationManager()
     {
         // Private constructor discourages unwanted instantiation.
-    }
-
-    /**
-     * Sets the configuration for the specified controller.
-     * <p>
-     * If the specified configuration is <code>null</code>, then any
-     * existing configuration bound to the specific controller is removed.
-     * Otherwise, the configuration is immediately copied and the copy is
-     * associated with the controller.
-     * <p>
-     * Note that as {@link ControllerConfiguration} is not threadsafe by
-     * default (unless you're using an immutable object from
-     * {@link ConfigurationUtils#immutableControllerConfiguration(ControllerConfiguration)}),
-     * <strong>it is critically important that the caller not update the
-     * configuration again until this call completes</strong>.  Failure
-     * to comply may lead to a corrupted configuration being used, which
-     * will cause undefined behavior.  Since modifying a mutable object
-     * while you've given it to another class is generally frowned upon,
-     * this isn't something most people should have to worry about.
-     * 
-     * @param controller the controller to associate the configuration with
-     * @param configuration the configuration to associate with the controller;
-     * if <code>null</code>, any existing configuration is cleared
-     */
-    public final static void setConfiguration(
-            NiceController controller, ControllerConfiguration configuration)
-    {
-        synchronized(configurationLock)
-        {
-            if (configuration == null)
-            {
-                // Clear config.
-                cachedImmutableconfigurationsByController.remove(controller);
-                configurationsByController.remove(controller);
-            }
-            else
-            {
-                ControllerConfiguration cachedValue =
-                    cachedImmutableconfigurationsByController.get(controller);
-                if (cachedValue == null || !cachedValue.equals(configuration))
-                {
-                    // New config we have to use.
-                    // Mark cache dirty.
-                    cachedImmutableconfigurationsByController.remove(controller);
-                    configurationsByController.put(controller,
-                            new ControllerConfiguration(configuration));
-                }
-            }
-        }
-    }
-
-    /**
-     * Returns a mutable copy of the configuration for the specified
-     * controller (only use if you actually require a mutable copy).
-     * <p>
-     * The returned copy is completely independent of the original.  It can
-     * be safely modified and can be used in a subsequent call to
-     * {@link #setConfiguration(Controller, ControllerConfiguration)}.
-     * <p>
-     * This method should <strong>only</strong> be used to obtain a
-     * <strong>mutable copy</strong> of the configuration.  If you do
-     * <em>not</em> need a mutable copy, you should call
-     * {@link #getImmutableConfiguration(Controller)} instead, which
-     * efficiently caches configurations until they are changed and
-     * can be called as often as necessary.
-     * 
-     * @param controller the controller to get the configuration for
-     * @return if the controller has previously been configured, an
-     * independent and mutable copy of the configuration for that controller;
-     * otherwise, <code>null</code>
-     */
-    public final static ControllerConfiguration getConfigurationCopy(
-            NiceController controller)
-    {
-        synchronized(configurationLock)
-        {
-            ControllerConfiguration mutable =
-                configurationsByController.get(controller);
-            if (mutable != null)
-            {
-                return new ControllerConfiguration(mutable);
-            }
-            return null;
-        }
-    }
-
-    /**
-     * Returns a cached, immutable and independent copy of the configuration
-     * for the specified controller.
-     * <p>
-     * Unlike {@link #getConfigurationCopy(Controller)}, this method will
-     * only construct a new {@link ControllerConfiguration} if the cache
-     * is dirty (that is, the configuration has been changed by a call
-     * to {@link #setConfiguration(Controller, ControllerConfiguration)}
-     * and the cache hasn't been updated yet).  This is much less expensive
-     * than calling {@link #getConfigurationCopy(Controller)} in almost
-     * all cases, and is the recommended way to ask for a configuration
-     * so long as you do not need to alter it.
-     * <p>
-     * Any attempt to modify the immutable configuration will fail.  The
-     * immutable configuration is also completely independent of the original
-     * mutable source (it is not just a wrapper)
-     * 
-     * @param controller
-     * @return
-     */
-    public final static ControllerConfiguration getImmutableConfiguration(
-            NiceController controller)
-    {
-        synchronized(configurationLock)
-        {
-            ControllerConfiguration config =
-                cachedImmutableconfigurationsByController.get(controller);
-            if (config == null)
-            {
-                // Not cached.  Do lookup.
-                ControllerConfiguration mutable =
-                    configurationsByController.get(controller);
-                if (mutable != null)
-                {
-                    // Found it.  Cache it and use as the return value.
-                    config = ConfigurationUtils
-                        .immutableControllerConfiguration(mutable);
-                    cachedImmutableconfigurationsByController.put(
-                            controller, config);
-                }
-            }
-            return config;
-        }
     }
 
     /**
@@ -321,7 +170,7 @@ public final class ConfigurationManager
      * @see #loadConfigurationByType(Controller)
      * @throws IOException if there is a problem while writing the file
      */
-    public final static File saveConfigurationByType(
+    final static File saveConfigurationByType(
             ControllerConfiguration configuration)
     throws IOException
     {
@@ -367,7 +216,7 @@ public final class ConfigurationManager
      * @see #loadConfigurationByType(Controller, String)
      * @throws IOException if there is a problem while writing the file
      */
-    public final static File saveConfigurationByType(
+    final static File saveConfigurationByType(
             ControllerConfiguration configuration, String namespace)
     throws IOException
     {
@@ -394,7 +243,7 @@ public final class ConfigurationManager
      * @see #loadConfiguration(Controller, File)
      * @throws IOException if there is a problem while writing the file
      */
-    public final static void saveConfiguration(
+    final static void saveConfiguration(
             ControllerConfiguration configuration, File destinationFile)
     throws IOException
     {
@@ -442,7 +291,7 @@ public final class ConfigurationManager
      * or cannot be interpreted due to a version mismatch (i.e., trying to
      * read a configuration generated by a newer major version of this library)
      */
-    public final static ControllerConfiguration loadConfigurationByType(
+    final static ControllerConfiguration loadConfigurationByType(
             NiceController controller)
     throws IOException, ConfigurationException
     {
@@ -473,7 +322,7 @@ public final class ConfigurationManager
      * or cannot be interpreted due to a version mismatch (i.e., trying to
      * read a configuration generated by a newer major version of this library)
      */
-    public final static ControllerConfiguration loadConfigurationByType(
+    final static ControllerConfiguration loadConfigurationByType(
             NiceController controller, String namespace)
     throws IOException, ConfigurationException
     {
@@ -502,7 +351,7 @@ public final class ConfigurationManager
      * or cannot be interpreted due to a version mismatch (i.e., trying to
      * read a configuration generated by a newer major version of this library)
      */
-    public final static ControllerConfiguration loadConfiguration(
+    final static ControllerConfiguration loadConfiguration(
             NiceController controller, File sourceFile)
     throws IOException, ConfigurationException
     {
