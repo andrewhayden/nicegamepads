@@ -1,6 +1,7 @@
 package org.nicegamepads;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -19,15 +20,21 @@ import java.util.concurrent.TimeoutException;
 final class ControllerPoller
 {
     /**
+     * The controller this poller polls.
+     */
+    private final NiceController controller;
+
+    /**
      * The controller state used to store the state of the controller and
      * all of its controls.
      */
     private final ControllerState controllerState;
 
     /**
-     * The configuration for this poller.
+     * All pollers.  There is exactly one poller per controller.
      */
-    private volatile ControllerConfiguration volatileConfiguration;
+    private final static Map<NiceController, ControllerPoller>
+        pollersByController = new HashMap<NiceController, ControllerPoller>();
 
     /**
      * Holds cache of granularity calculations.
@@ -70,23 +77,40 @@ final class ControllerPoller
     private ScheduledFuture<?> pollingTask = null;
 
     /**
-     * Constructs a new poller for the specified configuration, optionally
-     * descending into all subcontrollers.
+     * Constructs a new poller for the specified controller.
      * <p>
-     * All of the controls found within the controller (and, if requested,
-     * all of its subcontrollers recursively expanded) can be polled
+     * All of the controls found within the controller can be polled
      * conveniently with this object.
      * 
-     * @param configuration the configuration for the controller to be polled
-     * @param deep whether or not to descend recursively into any and all
-     * subcontrollers or not
+     * @param controller the controller to be polled
      */
-    ControllerPoller(ControllerConfiguration configuration)
+    private ControllerPoller(NiceController controller)
     {
-        volatileConfiguration =
-            configuration.getController().getConfigurationCached();
-        this.controllerState = new ControllerState(volatileConfiguration);
+        this.controller = controller;
+        this.controllerState = new ControllerState(controller);
         pollingInvoker = new PollingInvoker(this);
+    }
+
+    private final void init()
+    {
+        // By default, start polling 60x per second
+        startPolling(1000L / 60L, TimeUnit.MILLISECONDS);
+    }
+
+    final static ControllerPoller getInstance(NiceController controller)
+    {
+        synchronized(pollersByController)
+        {
+            ControllerPoller instance =
+                pollersByController.get(controller);
+            if (instance == null)
+            {
+                instance = new ControllerPoller(controller);
+                instance.init();
+                pollersByController.put(controller, instance);
+            }
+            return instance;
+        }
     }
 
     /**
@@ -174,86 +198,6 @@ final class ControllerPoller
     }
 
     /**
-     * Returns an immutable version of the current configuation.
-     * <p>
-     * Subsequent changes to the configuration of this poller are not
-     * reflected in the returned object.  The returned object cannot be
-     * modified.  If you need a mutable configuration object, use the
-     * {@link #getConfiguration()} method instead.
-     * <p>
-     * This method is intended primarily for consumers who need to query
-     * the configuration quickly and inexpensively, and aren't interested
-     * in making changes to it.
-     * 
-     * @return an immutable version of the current configuration
-     */
-    final ControllerConfiguration getImmutableConfiguration()
-    {
-        return volatileConfiguration;
-    }
-
-    /**
-     * Returns the controller that this poller polls for.
-     * 
-     * @return the controller that this poller polls for
-     */
-    final NiceController getController()
-    {
-        return volatileConfiguration.getController();
-    }
-
-    /**
-     * Returns an independent copy of the current configuration.
-     * <p>
-     * Unlike {@link #getImmutableConfiguration()}, the returned object
-     * is mutable.  Note that the returned object is an independent copy
-     * of the currnet configuration.
-     * 
-     * @return
-     */
-    final ControllerConfiguration getConfiguration()
-    {
-        return new ControllerConfiguration(volatileConfiguration);
-    }
-
-    /**
-     * Sets a new configuration which will be used for the next polling
-     * operation.
-     * <p>
-     * An independent copy of the specified configuration is made and used
-     * for all polling operations that begin after this method completes.
-     * <p>
-     * This method is threadsafe.
-     * 
-     * @param configuration the configuration to use, which must not
-     * be <code>null</code> and must always refer to the same controller
-     * @throws IllegalArgumentException if the specified configuration is
-     * <code>null</code>
-     * @throws RuntimeException if an attempt is made to set a configuration
-     * that refers to a different controller than the previous configuration
-     */
-    final void setConfiguration(ControllerConfiguration configuration)
-    {
-        if (configuration == null)
-        {
-            throw new IllegalArgumentException(
-                    "Null configuration specified.");
-        }
-
-        if (configuration.getController() !=
-            volatileConfiguration.getController())
-        {
-            throw new RuntimeException(
-                    "An attempt was made to set a configuration with a "
-                    + "different associated controller");
-        }
-
-        // We will store an immutable reference as we should never, EVER
-        // change the configuration ourselves.
-        this.volatileConfiguration = configuration;
-    }
-
-    /**
      * Starts or resumes polling the controller associated with this poller.
      * <p>
      * If polling is already running, cancels the next polling interval and
@@ -265,7 +209,7 @@ final class ControllerPoller
      * @param interval the interval at which to poll
      * @param unit the time unit for the interval
      */
-    final void startPolling(long interval, TimeUnit unit)
+    private final void startPolling(long interval, TimeUnit unit)
     {
         synchronized(pollingInvoker)
         {
@@ -340,7 +284,8 @@ final class ControllerPoller
         // use only this copy for our entire method lifetime.
         // Since the source is volatile we are guaranteed that we are getting
         // the latest copy here.
-        final ControllerConfiguration config = volatileConfiguration;
+        final ControllerConfiguration config =
+            controller.getConfigurationCached();
         if (config == null)
         {
             throw new IllegalStateException("Null configuration.");
@@ -367,11 +312,11 @@ final class ControllerPoller
             float polledValue = state.control.getPollData();
             // Transform according to configuration rules
             polledValue = transform(
-                    polledValue, controlConfig, state.control.controlType);
+                    polledValue, controlConfig, state.control.getControlType());
             // Get any user ID bound to this value
             boolean forceFireTurboEvent = false;
 
-            switch (state.control.controlType)
+            switch (state.control.getControlType())
             {
                 case DISCRETE_INPUT:
                     state.newValue(polledValue, now, polledValue == 1f);
@@ -401,7 +346,7 @@ final class ControllerPoller
                     break;
                 default:
                     throw new RuntimeException("Unsupported control type: "
-                            + state.control.controlType);
+                            + state.control.getControlType());
             }
 
             ControlEvent event = makeEvent(state, controlConfig);
@@ -740,7 +685,7 @@ final class ControllerPoller
             ControlState state, ControlConfiguration config)
     {
         return new ControlEvent(
-                state.control.owner,
+                state.control.getController(),
                 state.control, config.getUserDefinedId(),
                 state.currentValue, config.getValueId(state.currentValue),
                 state.lastValue, config.getValueId(state.lastValue));

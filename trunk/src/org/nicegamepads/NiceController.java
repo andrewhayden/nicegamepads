@@ -212,7 +212,7 @@ public final class NiceController
         List<NiceControl> matchingControls = new ArrayList<NiceControl>();
         for (NiceControl control : allControls)
         {
-            if (control.controlType == type)
+            if (control.getControlType() == type)
             {
                 matchingControls.add(control);
             }
@@ -305,7 +305,7 @@ public final class NiceController
         {
             String controlName = control.getDeclaredName();
             if (controlName != null
-                    && control.controlType != NiceControlType.FEEDBACK)
+                    && control.getControlType() != NiceControlType.FEEDBACK)
             {
                 // Convert 
                 controlNames.add(controlName.toUpperCase());
@@ -656,5 +656,28 @@ public final class NiceController
             control.loadDeadZoneDefaults();
         }
         config.unlockConfiguration();
+    }
+
+    /**
+     * Applies the specified configuration to this controller immediately.
+     * <p>
+     * The specified configuration must be from a controller whose
+     * fingerprint mathches that of this controller; that is, you may only
+     * apply configurations between controllers if the controllers are of
+     * the same <em>exact</em> physical type.  For example, you may apply the
+     * configuration of one XBox 360 USB controller to another provided that
+     * they have the same hardware revision.
+     * <p>
+     * This method updates the live configuration.  All changes are applied
+     * immediately and are visible to all threads.
+     * 
+     * @param newConfig the configuration to apply
+     * @throws ConfigurationException if the specified other configuration
+     * comes from a controller whose fingerprint does not match that of this
+     * controller
+     */
+    public final void applyConfiguration(ControllerConfiguration newConfig)
+    {
+        config.loadFrom(newConfig);
     }
 }

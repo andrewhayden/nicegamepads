@@ -13,7 +13,7 @@ public class NiceControl
     private final static Map<Component, NiceControl> wrappersByControl
         = new HashMap<Component, NiceControl>();
 
-    public final NiceControlType controlType;
+    private final NiceControlType controlType;
 
     /**
      * The control being wrapped.
@@ -23,12 +23,12 @@ public class NiceControl
     /**
      * The controller that owns this control.
      */
-    public final NiceController owner;
+    private final NiceController controller;
 
     /**
      * Fingerprint for this control.
      */
-    public int fingerprint = 0;
+    private final int fingerprint;
 
     /**
      * Constructs a new wrapper for the specific control.
@@ -38,13 +38,15 @@ public class NiceControl
      * physical device.
      * 
      * @param jinputComponent the control to wrap
+     * @param controller the controller that contains this control
      */
-    private NiceControl(Component jinputComponent, NiceController owner)
+    private NiceControl(Component jinputComponent, NiceController controller)
     {
         this.jinputComponent = jinputComponent;
-        this.owner = owner;
+        this.controller = controller;
         // FIXME: Need to set good control type
         this.controlType = NiceControlType.CONTINUOUS_INPUT;
+        this.fingerprint = generateFingerprint();
     }
 
     /**
@@ -76,11 +78,6 @@ public class NiceControl
 
     public final int getFingerprint()
     {
-        // Lazily cache
-        if (fingerprint == 0)
-        {
-            this.fingerprint = generateFingerprint();
-        }
         return fingerprint;
     }
 
@@ -111,29 +108,52 @@ public class NiceControl
     }
 
     /**
-     * Load the default dead zones for the control.
+     * Load the default dead zones for the control into the live configuration.
+     * <p>
+     * This method takes effect immediately.
      */
     public final void loadDeadZoneDefaults()
     {
-        if (config != null)
+        ControllerConfiguration ownerConfig = controller.getConfigurationLive();
+        ownerConfig.lockConfiguration();
+        ControlConfiguration config = ownerConfig.getConfiguration(this);
+        float defaultDeadZone = jinputComponent.getDeadZone();
+        if (!Float.isNaN(defaultDeadZone)
+                && !Float.isInfinite(defaultDeadZone))
         {
-            float defaultDeadZone = jinputComponent.getDeadZone();
-            if (!Float.isNaN(defaultDeadZone)
-                    && !Float.isInfinite(defaultDeadZone))
-            {
-                // Valid float found.
-                // We only care about the absolute value; kill negatives.
-                defaultDeadZone = Math.abs(defaultDeadZone);
-                // Sanity check, clamp to range [0,1]
-                defaultDeadZone = Math.min(defaultDeadZone, 1.0f);
-                // Configure
-                config.setDeadZoneBounds(
-                    -1f * defaultDeadZone, defaultDeadZone);
-            }
-            else
-            {
-                config.setDeadZoneBounds(Float.NaN, Float.NaN);
-            }
+            // Valid float found.
+            // We only care about the absolute value; kill negatives.
+            defaultDeadZone = Math.abs(defaultDeadZone);
+            // Sanity check, clamp to range [0,1]
+            defaultDeadZone = Math.min(defaultDeadZone, 1.0f);
+            // Configure
+            config.setDeadZoneBounds(
+                -1f * defaultDeadZone, defaultDeadZone);
         }
+        else
+        {
+            config.setDeadZoneBounds(Float.NaN, Float.NaN);
+        }
+        ownerConfig.unlockConfiguration();
+    }
+
+    /**
+     * Returns the type of this control.
+     * 
+     * @return the type of this control.
+     */
+    public final NiceControlType getControlType()
+    {
+        return controlType;
+    }
+
+    /**
+     * Returns the controller that contains this control.
+     * 
+     * @return the controller that contains this control.
+     */
+    public final NiceController getController()
+    {
+        return controller;
     }
 }

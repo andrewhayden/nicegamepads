@@ -105,6 +105,57 @@ public class ControllerConfiguration
         source.unlockConfiguration();
     }
 
+    /**
+     * Loads all the settings from the specified configuration into this
+     * configuration.  This method can be used to copy settings between
+     * different controllers so long as their fingerprints are identical.
+     * 
+     * @param other the source object to copy settings from
+     * @throws ConfigurationException if the specified other configuration
+     * has a different fingerprint than this controller
+     */
+    public void loadFrom(ControllerConfiguration other)
+    {
+        if (other == this)
+        {
+            return;
+        }
+        else if (other.controller != controller)
+        {
+            if (other.controller.getFingerprint()
+                    != controller.getFingerprint())
+            {
+                throw new ConfigurationException(
+                        "Specified source configuration has fingerprint "
+                        + other.controller.getFingerprint()
+                        + ", which does not match the destination fingerprint "
+                        + controller.getFingerprint());
+            }
+
+            // Need to translate into a map and load the map, because we
+            // don't have references to the same objects
+            Map<String, String> otherConfigAsMap = other.saveToMap("internal");
+            loadFromMap("internal", otherConfigAsMap);
+        }
+        else
+        {
+            // Same underlying objects; we can do this more efficiently.
+            // Must construct a copy to ensure thread safety while avoiding
+            // deadlock; otherwise we'd have to acquire both the sources' lock
+            // and our own to do this safely.
+            ControllerConfiguration source =
+                new ControllerConfiguration(other);
+            lockConfiguration();
+            for (ControlConfiguration controlConfig :
+                controlConfigurations.values())
+            {
+                controlConfig.loadFrom(
+                        source.getConfiguration(controlConfig.control));
+            }
+            unlockConfiguration(true);
+        }
+    }
+
     final void lockConfiguration()
     {
         modificationLock.lock();

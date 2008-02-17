@@ -18,7 +18,7 @@ public class ComponentIdentificationTest
         NiceController controller = gamepads.get(0);
         ControllerConfiguration config = new ControllerConfiguration(controller);
         //ControllerUtils.loadDeadZoneDefaults(controller, config, true);
-        controller.setAnalogDeadZones(-0.1f, 0.1f);
+        controller.setAllAnalogDeadZones(-0.1f, 0.1f);
         System.out.println(config);
         ControllerConfigurator configurator =
             new ControllerConfigurator(controller, config);

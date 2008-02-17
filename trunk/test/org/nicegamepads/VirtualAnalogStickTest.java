@@ -3,7 +3,6 @@ package org.nicegamepads;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 public class VirtualAnalogStickTest
 {
@@ -15,13 +14,13 @@ public class VirtualAnalogStickTest
         NiceController controller = gamepads.get(0);
         System.out.println("gamepad: " + controller.getDeclaredName() + "; fingerprint=" + controller.getFingerprint());
 
-        ControllerConfiguration config = new ControllerConfiguration(controller);
-        controller.setAnalogDeadZones(-0.1f, 0.1f);
-        controller.setAnalogGranularities(0.1f);
+        controller.setAllAnalogDeadZones(-0.1f, 0.1f);
+        controller.setAllAnalogGranularities(0.1f);
+        ControllerConfiguration config = controller.getConfigurationLive();
         System.out.println(config);
 
         ControllerConfigurator configurator =
-            new ControllerConfigurator(controller, config);
+            new ControllerConfigurator(controller);
         
         ControlEvent event = null;
         Set<NiceControl> identifiedControls = new HashSet<NiceControl>();
@@ -74,7 +73,7 @@ public class VirtualAnalogStickTest
             e.printStackTrace();
         }
 
-        ControllerPoller poller = new ControllerPoller(config);
+        ControllerPoller poller = ControllerPoller.getInstance(controller);
         
         //final ControllerConfiguration staticConfig = config;
         final VirtualAnalogStick virtualStick = new VirtualAnalogStick(
@@ -92,8 +91,6 @@ public class VirtualAnalogStickTest
                 System.out.println("Virtual stick: degrees=" + vector.directionCompassDegrees + ", magnitude=" + vector.magnitude);
             }
         });
-
-        poller.startPolling(10, TimeUnit.MILLISECONDS);
 
         // Wait forever...
         System.out.println("Waiting for input.");
