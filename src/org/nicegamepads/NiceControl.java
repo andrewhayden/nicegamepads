@@ -31,6 +31,11 @@ public class NiceControl
     private final int fingerprint;
 
     /**
+     * Whether or not this is a relative control.
+     */
+    private final boolean isRelative;
+
+    /**
      * Constructs a new wrapper for the specific control.
      * <p>
      * All NiceController instances share a static cache of objects that is
@@ -46,6 +51,9 @@ public class NiceControl
         this.controller = controller;
         // FIXME: Need to set good control type
         this.controlType = NiceControlType.CONTINUOUS_INPUT;
+        // FIXME: Need to determine whether or not this control is relative
+        this.isRelative = true;
+
         this.fingerprint = generateFingerprint();
     }
 
@@ -168,5 +176,18 @@ public class NiceControl
     {
         float value = jinputComponent.getPollData();
         state.rawCurrentValue = value;
+    }
+
+    /**
+     * Returns whether or not this is a relative control.  Relative controls
+     * produce values that represent the change from the last polled value
+     * instead of values representing an absolute position from some fixed
+     * "home" point.  Steering wheels are often relative.
+     * 
+     * @return <code>true</code>
+     */
+    final boolean isRelative()
+    {
+        return isRelative;
     }
 }

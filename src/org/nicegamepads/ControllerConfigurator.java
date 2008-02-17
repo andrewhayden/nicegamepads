@@ -462,59 +462,31 @@ public class ControllerConfigurator
                 }
             }
 
-            if (event.sourceControl.getControlType() == NiceControlType.DISCRETE_INPUT)
+            if (event.sourceControl.getControlType() ==
+                NiceControlType.DISCRETE_INPUT)
             {
-                if (!boundsHit)
+                // Discrete controls report precise values.
+                // Wait for a non-zero value.
+                if (event.currentValue != 0f)
                 {
-                    // Wait for value to hit 1.0, then return to 0.
-                    if (event.currentValue == 1.0f)
-                    {
-                        boundsReachedByControl.put(
-                                event.sourceControl, Boolean.TRUE);
-                        qualifyingValueByControl.put(
-                                event.sourceControl, event.currentValue);
-                    }
+                    boundsReachedByControl.put(
+                            event.sourceControl, Boolean.TRUE);
+                    qualifyingValueByControl.put(
+                            event.sourceControl, event.currentValue);
                 }
-                else
+                else if (boundsHit)
                 {
-                    // Value has already hit 1.0.  Wait for it to return to 0f.
-                    if (event.currentValue == 0.0f)
-                    {
-                        // Winner!
-                        winner = event;
-                    }
+                    // Have found a non-zero value, and current value is zero.
+                    // Winner!
+                    winner = event;
                 }
             }
-            else if (event.sourceControl.getControlType() == NiceControlType.CONTINUOUS_INPUT)
+            else if (event.sourceControl.getControlType() ==
+                NiceControlType.CONTINUOUS_INPUT)
             {
-                if (event.sourceControl.getIdentifier() == Identifier.Axis.POV)
-                {
-                    // POV hat controls have discrete values.
-                    // Any non-zero value will fulfill the bounds check.
-                    if (!boundsHit)
-                    {
-                        // Wait for value to hit any non-zeroo value and return
-                        // to zero.
-                        if (event.currentValue != 0.0f)
-                        {
-                            boundsReachedByControl.put(
-                                    event.sourceControl, Boolean.TRUE);
-                            qualifyingValueByControl.put(
-                                    event.sourceControl, event.currentValue);
-                        }
-                    }
-                    else
-                    {
-                        // Value has already hit a non-zero value;
-                        // Wait for it to return to 0f.
-                        if (event.currentValue == 0.0f)
-                        {
-                            // Winner!
-                            winner = event;
-                        }
-                    }
-                }
-                else if (event.sourceControl.isRelative())
+                // Continuous controls can theoretically take on any value
+                // in the allowed range.  These are usually analog in nature.
+                if (event.sourceControl.isRelative())
                 {
                     // Relative controls may never hit their range.
                     // Any non-zero value will fulfill the bounds check.
@@ -529,12 +501,19 @@ public class ControllerConfigurator
                 }
                 else
                 {
-                    // Other kind of axis, non-relative.  Force these to hit
-                    // their max range in order to win.
-                    if (!boundsHit)
+                    // Absolute controls should be able to hit their range.
+                    // But some can't quite get there due to slight
+                    // manufacturing defects or the shape of the casing.
+                    // So we'll watch for them to reach some reasonable
+                    // value and return to 0; say, 90% of the max range.
+                    // Wait for value to hit 1.0, then return to 0.
+                    // Similarly, some controls never quite hit zero.
+                    if (event.currentValue >= 0.9f || event.currentValue <= 0.9f)
                     {
-                        // Wait for value to hit 1.0, then return to 0.
-                        if (event.currentValue == 1.0f || event.currentValue == -1.0f)
+                        Float existingValue =
+                            qualifyingValueByControl.get(event.sourceControl);
+                        if (existingValue == null ||
+                                Math.abs(existingValue) < Math.abs(event.currentValue))
                         {
                             boundsReachedByControl.put(
                                     event.sourceControl, Boolean.TRUE);
@@ -542,14 +521,10 @@ public class ControllerConfigurator
                                     event.sourceControl, event.currentValue);
                         }
                     }
-                    else
+                    else if (-.1f <= event.currentValue && event.currentValue <= .1f)
                     {
-                        // Value has already hit +/- 1.0.  Wait for it to return to 0f.
-                        if (event.currentValue == 0.0f)
-                        {
-                            // Winner!
-                            winner = event;
-                        }
+                        // Winner!
+                        winner = event;
                     }
                 }
             }
