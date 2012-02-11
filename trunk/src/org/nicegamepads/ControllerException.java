@@ -5,6 +5,7 @@ package org.nicegamepads;
  * 
  * @author Andrew Hayden
  */
+@SuppressWarnings("serial")
 public class ControllerException extends Exception
 {
     /**

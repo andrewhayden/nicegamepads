@@ -6,6 +6,7 @@ package org.nicegamepads;
  * 
  * @author Andrew Hayden
  */
+@SuppressWarnings("serial")
 public class NoSuchControlException extends RuntimeException
 {
     /**
