@@ -389,7 +389,7 @@ final class ConfigurationManager
 
         String minorVersionString = asMap.get(
                 STANDARD_PREFIX + ".minorVersion");
-        if (majorVersionString == null)
+        if (minorVersionString == null)
         {
             throw new ConfigurationException(
                     "No minor version listed in configuration file: "
