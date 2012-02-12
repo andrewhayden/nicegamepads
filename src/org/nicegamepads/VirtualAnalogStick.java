@@ -140,21 +140,15 @@ public class VirtualAnalogStick
      * analog stick.
      * 
      * @param state the state to process
-     * @param result optionally, a pre-existing result object into which
-     * the results are placed and which is subsequently returned;
-     * if <code>null</code>, a new {@link BoundedVector} is created
-     * automatically.
      * @return a {@link BoundedVector} containing the result
      */
-    public final BoundedVector process(
-            ControllerState state, BoundedVector result)
+    public final BoundedVector process(ControllerState state)
     {
         return calculate(constraints,
                 eastWestOrientation,
                 state.getControlState(eastWestControl).getCurrentValue(),
                 northSouthOrientation,
-                state.getControlState(northSouthControl).getCurrentValue(),
-                result);
+                state.getControlState(northSouthControl).getCurrentValue());
     }
 
     /**
@@ -167,93 +161,81 @@ public class VirtualAnalogStick
      * control
      * @param northSouthValue the value to consider as that of the north-south
      * control
-     * @param result optionally, a pre-existing result object into which
-     * the results are placed and which is subsequently returned;
-     * if <code>null</code>, a new {@link BoundedVector} is created
-     * automatically.
      * @return a {@link BoundedVector} containing the result
      */
-    public final BoundedVector process(
-            float eastWestValue, float northSouthValue,
-            BoundedVector result)
+    public final BoundedVector process(final float eastWestValue, final float northSouthValue)
     {
         return calculate(constraints,
                 eastWestOrientation, eastWestValue,
-                northSouthOrientation, northSouthValue,
-                result);
+                northSouthOrientation, northSouthValue);
     }
 
     final static BoundedVector calculate(
             PhysicalConstraints physicalConstraints,
             HorizontalOrientation horizontalOrientation, float horizontalValue,
-            VerticalOrientation verticalOrientation, float verticalValue,
-            BoundedVector result)
+            VerticalOrientation verticalOrientation, float verticalValue)
     {
-        //FIXME: comment
-        if (result == null)
-        {
-            result = new BoundedVector();
-        }
+        BoundedVector.Builder builder = new BoundedVector.Builder();
 
         // In general, most of the time the control is at rest and we can
         // short-circuit that case here.
         if (horizontalValue == 0f && verticalValue == 0f)
         {
-            result.directionCompassDegrees = 0f;
-            result.directionCompassRadians = 0f;
-            result.directionJavaDegrees = 90f;
-            result.directionJavaRadians = (float) (Math.PI / 2d);
-            result.easterlyComponent = 0f;
-            result.southerlyComponent = 0f;
-            result.magnitude = 0f;
-            return result;
+            builder.setDirectionCompassDegrees(0f);
+            builder.setDirectionCompassRadians(0f);
+            builder.setDirectionJavaDegrees(90f);
+            builder.setDirectionJavaRadians((float) (Math.PI / 2d));
+            builder.setEasterlyComponent(0f);
+            builder.setSoutherlyComponent(0f);
+            builder.setMagnitude(0f);
+            return builder.build();
         }
 
         // Otherwise, we have to do all the calculations...
 
         if (horizontalOrientation == HorizontalOrientation.EAST_POSITIVE)
         {
-            result.easterlyComponent = horizontalValue;
+            builder.setEasterlyComponent(horizontalValue);
         }
         else
         {
-            result.easterlyComponent = -1f * horizontalValue;
+            builder.setEasterlyComponent(-1f * horizontalValue);
         }
 
         if (verticalOrientation == VerticalOrientation.SOUTH_POSITIVE)
         {
-            result.southerlyComponent = verticalValue;
+            builder.setSoutherlyComponent(verticalValue);
         }
         else
         {
-            result.southerlyComponent = -1f * verticalValue;
+            builder.setSoutherlyComponent(-1f * verticalValue);
         }
 
         // Calculate degrees and radians
-        result.directionJavaRadians = (float)
-            Math.atan2(verticalValue, horizontalValue);
+        builder.setDirectionJavaRadians((float)
+            Math.atan2(verticalValue, horizontalValue));
 
-        result.directionJavaDegrees = (float)
-            Math.toDegrees(result.directionJavaRadians);
+        builder.setDirectionJavaDegrees((float)
+            Math.toDegrees(builder.getDirectionJavaRadians()));
         
         // Java is based on a compass where east is 0 and values increase
         // clockwise.  The magnetic compass is based on north 0 and also
         // increasing clockwise.  So to get from Java to compass, we
         // need to offset by -90 degrees or -(pi/2)
-        float compassDegrees = result.directionJavaDegrees + 90f;
+        float compassDegrees = builder.getDirectionJavaDegrees() + 90f;
         if (compassDegrees < 0)
         {
             compassDegrees += 360f;
         }
-        result.directionCompassDegrees = compassDegrees;
+        builder.setDirectionCompassDegrees(compassDegrees);
         
         float compassRadians = (float)
-            (Math.toRadians(result.directionJavaDegrees) - (Math.PI / 2d));
+            (Math.toRadians(builder.getDirectionJavaDegrees()) - (Math.PI / 2d));
         if (compassRadians < 0)
         {
             compassRadians += Math.PI * 2d;
         }
-        result.directionCompassRadians = compassRadians;
+        builder.setDirectionCompassRadians(compassRadians);
 
         // In all cases, we can consider the two values as forming the
         // endpoints of two edges of a right triangle whose right angle
@@ -277,23 +259,23 @@ public class VirtualAnalogStick
         //
         // In both cases this is an accurate representation of the magnitude
         // of the vector.  What is different is the upper bound in each case.
-        result.magnitude = (float) Math.hypot(horizontalValue, verticalValue);
         if (physicalConstraints == PhysicalConstraints.CIRCULAR)
         {
-            result.maxMagnitude = 1.0f;
+            builder.setMaxMagnitude(1.0f);
         }
         else
         {
-            result.maxMagnitude = ROOT2;
+            builder.setMaxMagnitude(ROOT2);
         }
-
+        final float desiredMagnitude = (float) Math.hypot(horizontalValue, verticalValue);
         // Protected against floating point precision loss resulting in
         // overflow beyond the boundary
-        if (result.magnitude > result.maxMagnitude)
-        {
-            result.magnitude = result.maxMagnitude;
+        if (builder.getMagnitude() > builder.getMaxMagnitude()) {
+            builder.setMagnitude(builder.getMaxMagnitude());
+        } else {
+            builder.setMagnitude(desiredMagnitude);
         }
 
-        return result;
+        return builder.build();
     }
 }

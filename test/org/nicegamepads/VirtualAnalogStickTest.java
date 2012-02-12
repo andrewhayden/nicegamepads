@@ -81,14 +81,12 @@ public class VirtualAnalogStickTest
                 eastWest, northSouth,
                 eastWestOrientation, northSouthOrientation);
 
-        final BoundedVector vector = new BoundedVector();
-
         poller.addControllerPollingListener(new ControllerPollingListener(){
             @Override
             public void controllerPolled(ControllerState controllerState)
             {
-                virtualStick.process(controllerState, vector);
-                System.out.println("Virtual stick: degrees=" + vector.directionCompassDegrees + ", magnitude=" + vector.magnitude);
+                final BoundedVector vector = virtualStick.process(controllerState);
+                System.out.println("Virtual stick: degrees=" + vector.getDirectionCompassDegrees() + ", magnitude=" + vector.getMagnitude());
             }
         });
 
