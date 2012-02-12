@@ -2,7 +2,6 @@ package org.nicegamepads;
 
 import java.util.List;
 
-import org.nicegamepads.CalibrationResults.Range;
 
 public class ControllerCalibrationTest
 {
