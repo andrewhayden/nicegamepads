@@ -2,6 +2,8 @@ package org.nicegamepads;
 
 /**
  * Simple container for a range.
+ * <p>
+ * This class is threadsafe and immutable.
  * 
  * @author Andrew Hayden
  */

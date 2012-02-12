@@ -6,38 +6,9 @@ package org.nicegamepads;
  * @author Andrew Hayden
  */
 @SuppressWarnings("serial")
-public class ConfigurationException extends RuntimeException
-{
-    /**
-     * Default constructor.
-     */
-    public ConfigurationException()
-    {
-        super();
-    }
-
-    /**
-     * @param message
-     * @param cause
-     */
-    public ConfigurationException(String message, Throwable cause)
-    {
-        super(message, cause);
-    }
-
-    /**
-     * @param message
-     */
-    public ConfigurationException(String message)
-    {
-        super(message);
-    }
-
-    /**
-     * @param cause
-     */
-    public ConfigurationException(Throwable cause)
-    {
-        super(cause);
-    }
+public class ConfigurationException extends RuntimeException {
+    public ConfigurationException() { super(); }
+    public ConfigurationException(String message, Throwable cause) { super(message, cause); }
+    public ConfigurationException(String message) { super(message); }
+    public ConfigurationException(Throwable cause) { super(cause); }
 }

@@ -1,16 +1,15 @@
 package org.nicegamepads;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Encapsulates the results of a calibration operation.
  * <p>
- * This class and all of its methods are threadsafe.
+ * This class is threadsafe and immutable.
  * 
  * @author Andrew Hayden
  */
@@ -27,63 +26,55 @@ public final class CalibrationResults
     private final NiceController controller;
 
     /**
-     * Constructs a new set of calibration results.
+     * Creates a new immutable and independent results object from the
+     * specified builder.
+     * 
+     * @param builder the builder to use as a source of information
      */
-    public CalibrationResults(NiceController controller)
-    {
-        this.controller = controller;
-        rangesByControl = Collections.synchronizedMap(
-                new HashMap<NiceControl, Range>());
+    public CalibrationResults(final CalibrationBuilder builder) {
+        this.controller = builder.getController();
+        this.rangesByControl = Collections.unmodifiableMap(
+                new HashMap<NiceControl, Range>(builder.getRangesByControl()));
     }
 
     /**
-     * Constructs a new, independent copy of the specified source.
+     * Constructs a copy of the specified source.
      * 
      * @param source the source to copy from
      */
-    public CalibrationResults(CalibrationResults source)
+    public CalibrationResults(final CalibrationResults source)
     {
-        synchronized(source.rangesByControl)
-        {
-            this.controller = source.controller;
-            this.rangesByControl = source.getResults();
-        }
+        this.controller = source.getController();
+        this.rangesByControl = source.getResults();
     }
 
     /**
-     * Returns an independent copy of the range for the specified component.
+     * Returns the range for the specified component.
      * 
      * @param control the control to look up the range for
-     * @return an independent copy of the range for the specified control,
+     * @return the range for the specified control,
      * if any has been recorded; otherwise, <code>null</code>
      */
-    public final Range getRange(NiceControl control)
+    public final Range getRange(final NiceControl control)
     {
-        Range range = rangesByControl.get(control);
-        if (range != null)
-        {
-            return new Range(range);
-        }
-        return null;
+        return rangesByControl.get(control);
     }
 
     /**
-     * Returns a list of all the controls that currently have ranges
+     * Returns a set of all the controls that currently have ranges
      * in this result.
      * 
-     * @return such a list
+     * @return such a set
      */
-    public final Collection<NiceControl> getComponentsSeen()
+    public final Set<NiceControl> getComponentsSeen()
     {
-        synchronized(rangesByControl)
-        {
-            return new ArrayList<NiceControl>(rangesByControl.keySet());
-        }
+        return rangesByControl.keySet();
     }
 
     /**
-     * Returns a list of the controls that currently have ranges of
-     * either singularity or non-singularity nature (as specified).
+     * Returns a map of the controls that currently have ranges of
+     * either singularity or non-singularity nature (as specified); the keys
+     * are the controls, the values the ranges.
      * <p>
      * Ranges that are singularities represent a mathematical point;
      * that is, <code>low == high</code> and so the size of the range is zero.
@@ -97,22 +88,16 @@ public final class CalibrationResults
      * (if <code>singularities==true</code>) or not
      * (if <code>singularities==false</code>)
      */
-    public final Map<NiceControl, Range> getResultsByRangeType(
-            boolean singularities)
+    public final Map<NiceControl, Range> getResultsByRangeType(final boolean singularities)
     {
-        synchronized(rangesByControl)
-        {
-            Map<NiceControl, Range> results = new HashMap<NiceControl, Range>();
-            for (Map.Entry<NiceControl, Range> entry : rangesByControl.entrySet())
-            {
-                Range range = entry.getValue();
-                if (range.isSingularity() == singularities)
-                {
-                    results.put(entry.getKey(), new Range(range));
-                }
+        final Map<NiceControl, Range> results = new HashMap<NiceControl, Range>();
+        for (Map.Entry<NiceControl, Range> entry : rangesByControl.entrySet()) {
+            final Range range = entry.getValue();
+            if (range.isSingularity() == singularities) {
+                results.put(entry.getKey(), new Range(range));
             }
-            return results;
         }
+        return results;
     }
 
     /**
@@ -128,105 +113,30 @@ public final class CalibrationResults
      */
     public final Map<NiceControl, Range> getNonStandardResults()
     {
-        synchronized(rangesByControl)
-        {
-            final Map<NiceControl, Range> results = new HashMap<NiceControl, Range>();
-            for (Map.Entry<NiceControl, Range> entry : rangesByControl.entrySet())
-            {
-                Range range = entry.getValue();
-                final float high = range.getHigh();
-                final float low = range.getLow();
-                if (!((high != 0f  && high != -1f && high != 1f)
-                        || (low != 0f  && low != -1f && low != 1f))) {
-                    results.put(entry.getKey(), new Range(range));
-                }
+        final Map<NiceControl, Range> results = new HashMap<NiceControl, Range>();
+        for (Map.Entry<NiceControl, Range> entry : rangesByControl.entrySet()) {
+            final Range range = entry.getValue();
+            final float high = range.getHigh();
+            final float low = range.getLow();
+            if (!((high != 0f  && high != -1f && high != 1f)
+                    || (low != 0f  && low != -1f && low != 1f))) {
+                results.put(entry.getKey(), new Range(range));
             }
-            return results;
         }
+        return results;
     }
 
     /**
-     * Returns a copy of the results.
+     * Returns all of the results.
      * <p>
      * Each entry in the returned map consists of a component and the range
-     * seen for that component.
+     * seen for that component.  The returned map is immutable and threadsafe.
      * 
      * @return a copy of the results
      */
     public final Map<NiceControl, Range> getResults()
     {
-        synchronized(rangesByControl)
-        {
-            Map<NiceControl, Range> results = new HashMap<NiceControl, Range>(
-                    rangesByControl.size());
-            for (Map.Entry<NiceControl, Range> entry : rangesByControl.entrySet())
-            {
-                results.put(entry.getKey(), new Range(entry.getValue()));
-            }
-            return results;
-        }
-    }
-
-    /**
-     * Sets the range for the specified control.
-     * 
-     * @param control the control to set the range for
-     * @param range the range to set
-     */
-    final void setRange(NiceControl control, Range range)
-    {
-        rangesByControl.put(control, range);
-    }
-
-    /**
-     * Clears all data from the results.
-     */
-    final void clear()
-    {
-        rangesByControl.clear();
-    }
-
-    /**
-     * Processes a value and updates the appropriate range as necessary.
-     * 
-     * @param control the control from which the value was recorded
-     * @param value the value recorded; infinities and floats that are
-     * representations of non-a-number (NaN) are ignored
-     * @return <code>true</code> if a range was created or updated as a
-     * result of this operation; otherwise, <code>false</code>
-     */
-    final boolean processValue(final NiceControl control, float value)
-    {
-        // Cannot process infinite or NaN values
-        if (Float.isInfinite(value) || Float.isNaN(value))
-        {
-            return false;
-        }
-
-        synchronized(rangesByControl)
-        {
-            final boolean updated;
-            Range range = rangesByControl.get(control);
-            if (range == null)
-            {
-                rangesByControl.put(control, new Range(value, value));
-                updated = true;
-            }
-            else
-            {
-                if (value < range.getLow()) {
-                    rangesByControl.put(control, new Range(value, range.getHigh()));
-                    updated = true;
-                }
-                else if (value > range.getHigh()) {
-                    rangesByControl.put(control, new Range(range.getLow(), value));
-                    updated = true;
-                } else {
-                    updated = false;
-                }
-            }
-            return updated;
-        }
+        return rangesByControl;
     }
 
     /**
@@ -242,8 +152,8 @@ public final class CalibrationResults
     @Override
     public final String toString()
     {
-        StringBuilder buffer = new StringBuilder();
-        Map<NiceControl, Range> results = getResults();
+        final StringBuilder buffer = new StringBuilder();
+        final Map<NiceControl, Range> results = getResults();
         buffer.append(CalibrationResults.class.getName());
         buffer.append(": [");
         buffer.append("controller=");

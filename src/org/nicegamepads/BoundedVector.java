@@ -8,6 +8,8 @@ package org.nicegamepads;
  * name "BoundedVector".  Specifically, the direction will always
  * be in the range [0, 360) and the magnitude will always be in the
  * range [0, {@link #maxMagnitude}].
+ * <p>
+ * This class is threadsafe and immutable.
  * 
  * @author Andrew Hayden
  */

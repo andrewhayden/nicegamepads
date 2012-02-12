@@ -348,14 +348,12 @@ public class ControllerConfigurator
                     for (CalibrationListener listener : calibrationListeners)
                     {
                         listener.calibrationStopped(
-                                controller,
-                                new CalibrationResults(
-                                        calibrationHelper.results));
+                                controller, calibrationHelper.builder.build());
                     }
                 }
             });
 
-            return calibrationHelper.results;
+            return calibrationHelper.builder.build();
         }
     }
     /**
@@ -563,7 +561,7 @@ public class ControllerConfigurator
         /**
          * Calibration results.
          */
-        final CalibrationResults results = new CalibrationResults(controller);
+        final CalibrationBuilder builder = new CalibrationBuilder(controller);
 
         /**
          * Whether or not calibration is running.
@@ -590,12 +588,10 @@ public class ControllerConfigurator
                 return;
             }
 
-            boolean updated =
-                results.processValue(event.sourceControl, event.currentValue);
+            boolean updated = builder.processValue(event.sourceControl, event.currentValue);
             if (updated)
             {
-                final Range newRange = new Range(
-                        results.getRange(event.sourceControl));
+                final Range newRange = new Range(builder.getRange(event.sourceControl));
 
                 ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
                     @Override
