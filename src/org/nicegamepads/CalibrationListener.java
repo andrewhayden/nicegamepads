@@ -32,5 +32,5 @@ public interface CalibrationListener
      * @param range the new range
      */
     public abstract void calibrationResultsUpdated(NiceController controller,
-            NiceControl control, CalibrationResults.Range range);
+            NiceControl control, Range range);
 }

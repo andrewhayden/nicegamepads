@@ -17,67 +17,6 @@ import java.util.Map;
 public final class CalibrationResults
 {
     /**
-     * Simple container for a range.
-     * 
-     * @author Andrew Hayden
-     */
-    public final static class Range
-    {
-        /**
-         * Low value of the range.
-         */
-        public float low;
-
-        /**
-         * High value of the range.
-         */
-        public float high;
-
-        /**
-         * Whether or not the range represents a singularity (where the
-         * low and high values are equal).
-         */
-        public boolean isSingularity;
-
-        /**
-         * The size of the range, for convenience, calculated as
-         * <code>Math.abs(high - low)</code>.
-         */
-        public float size;
-
-        /**
-         * Constructs a new range with the specified values.
-         * 
-         * @param low the low value
-         * @param high the high value
-         */
-        public Range(float low, float high)
-        {
-            this.low = low;
-            this.high = high;
-            this.isSingularity = (low == high);
-            this.size = Math.abs(high - low);
-        }
-
-        /**
-         * Copies another range.
-         * 
-         * @param source the range to copy from
-         */
-        public Range(Range source)
-        {
-            this(source.low, source.high);
-        }
-
-        @Override
-        public final String toString()
-        {
-            return CalibrationResults.Range.class.getName()
-                + ": [" + low + "," + high + "]";
-        }
-    }
-
-    /**
      * All ranges by control.
      */
     private final Map<NiceControl, Range> rangesByControl;
@@ -167,7 +106,7 @@ public final class CalibrationResults
             for (Map.Entry<NiceControl, Range> entry : rangesByControl.entrySet())
             {
                 Range range = entry.getValue();
-                if (range.isSingularity == singularities)
+                if (range.isSingularity() == singularities)
                 {
                     results.put(entry.getKey(), new Range(range));
                 }
@@ -191,19 +130,14 @@ public final class CalibrationResults
     {
         synchronized(rangesByControl)
         {
-            Map<NiceControl, Range> results = new HashMap<NiceControl, Range>();
+            final Map<NiceControl, Range> results = new HashMap<NiceControl, Range>();
             for (Map.Entry<NiceControl, Range> entry : rangesByControl.entrySet())
             {
                 Range range = entry.getValue();
-                if (!(
-                        (range.high != 0f 
-                        && range.high != -1f
-                        && range.high != 1f)
-                        ||
-                        (range.low != 0f 
-                        && range.low != -1f
-                        && range.low != 1f)))
-                {
+                final float high = range.getHigh();
+                final float low = range.getLow();
+                if (!((high != 0f  && high != -1f && high != 1f)
+                        || (low != 0f  && low != -1f && low != 1f))) {
                     results.put(entry.getKey(), new Range(range));
                 }
             }
@@ -280,22 +214,17 @@ public final class CalibrationResults
             }
             else
             {
-                if (value < range.low)
-                {
-                    range.low = value;
+                if (value < range.getLow()) {
+                    rangesByControl.put(control, new Range(value, range.getHigh()));
                     updated = true;
                 }
-                else if (value > range.high)
-                {
-                    range.high = value;
+                else if (value > range.getHigh()) {
+                    rangesByControl.put(control, new Range(range.getLow(), value));
                     updated = true;
-                }
-                else
-                {
+                } else {
                     updated = false;
                 }
             }
-
             return updated;
         }
     }
