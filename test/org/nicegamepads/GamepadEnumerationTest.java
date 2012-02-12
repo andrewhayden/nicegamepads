@@ -10,7 +10,7 @@ public class GamepadEnumerationTest
         List<NiceController> gamepads = NiceController.getAllControllers();
         for (NiceController controller : gamepads)
         {
-            System.out.println("gamepad: " + controller.getDeclaredName() + "; fingerprint=" + controller.getFingerprint());
+            System.out.println("controller: " + controller.getDeclaredName() + "; isGamepadLike=" + controller.isGamepadLike() + "; fingerprint=" + controller.getFingerprint());
         }
         ControllerManager.shutdown();
     }
