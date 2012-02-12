@@ -9,7 +9,7 @@ public class ComponentIdentificationTest
     public final static void main(String[] args)
     {
         ControllerManager.initialize();
-        List<NiceController> gamepads = NiceController.getAllControllers();
+        List<NiceController> gamepads = NiceController.getAllGamepads();
         for (NiceController controller : gamepads)
         {
             System.out.println("gamepad: " + controller.getDeclaredName() + "; fingerprint=" + controller.getFingerprint());

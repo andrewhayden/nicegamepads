@@ -9,7 +9,7 @@ public class VirtualAnalogStickTest
     public final static void main(String[] args)
     {
         ControllerManager.initialize();
-        List<NiceController> gamepads = NiceController.getAllControllers();
+        List<NiceController> gamepads = NiceController.getAllGamepads();
 
         NiceController controller = gamepads.get(0);
         System.out.println("gamepad: " + controller.getDeclaredName() + "; fingerprint=" + controller.getFingerprint());

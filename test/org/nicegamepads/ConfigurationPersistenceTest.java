@@ -11,7 +11,7 @@ public class ConfigurationPersistenceTest
     public final static void main(String[] args) throws IOException
     {
         ControllerManager.initialize();
-        List<NiceController> gamepads = NiceController.getAllControllers();
+        List<NiceController> gamepads = NiceController.getAllGamepads();
 
         NiceController controller = gamepads.get(0);
         System.out.println("gamepad: " + controller.getDeclaredName() + "; fingerprint=" + controller.getFingerprint());
