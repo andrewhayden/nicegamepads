@@ -272,6 +272,12 @@ public final class NiceController
                 // This seems to indicate that it isn't a gamepad.
                 return false;
             }
+
+            if (uppercase.contains("RECEIVER"))
+            {
+                // Probably just an intermediary component, ignore
+                return false;
+            }
         }
 
         // ====================================================================
@@ -376,6 +382,9 @@ public final class NiceController
      *     in the locale of the host.</li>
      * <li>If the name contains the substring "KEYBOARD" or "MOUSE" assume
      *     that the device is a keyboard or mouse respectively and return
+     *     <code>false</code>.</li>
+     * <li>If the name contains the substring "RECEIVER" assume
+     *     that the device is a communications helper and return
      *     <code>false</code>.</li>
      * <li>Check if it has rumblers.  If it does, assume that no sane
      *     manufacturer includes a rumbler in a keyboard or mouse and
