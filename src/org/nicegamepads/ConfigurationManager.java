@@ -15,7 +15,7 @@ import java.util.Properties;
  * 
  * @author Andrew Hayden
  */
-final class ConfigurationManager
+public final class ConfigurationManager
 {
     /**
      * Standard prefix used for saving configurations.
@@ -60,7 +60,7 @@ final class ConfigurationManager
      * 
      * @see #MAJOR_VERSION
      */
-    final static int MINOR_VERSION = 1;
+    final static int MINOR_VERSION = 2;
 
     /**
      * Private constructor discourages unwanted instantiation.
@@ -103,19 +103,14 @@ final class ConfigurationManager
     private final static String getConfigPath()
     {
         String path = System.getProperty(CONFIG_PATH_PROPERTY);
-        if (path != null)
-        {
+        if (path != null) {
             path = path.replaceAll("\\", "/");
-            if (!path.endsWith("/"))
-            {
+            if (!path.endsWith("/")) {
                 path += "/";
             }
-        }
-        else
-        {
+        } else {
             path = DEFAULT_CONFIG_PATH;
         }
-
         return path;
     }
 
@@ -132,14 +127,12 @@ final class ConfigurationManager
      * namespace
      */
     private final static String inferConfigFilePath(
-            NiceController controller, String namespace)
+            final NiceController controller, final String namespace)
     {
-        if (namespace != null && namespace.length() > 0)
-        {
+        if (namespace != null && namespace.length() > 0) {
             return getConfigPath() + namespace + "_"
                 + controller.getFingerprint();
         }
-
         return getConfigPath() + controller.getFingerprint();
     }
 
@@ -170,10 +163,8 @@ final class ConfigurationManager
      * @see #loadConfigurationByType(Controller)
      * @throws IOException if there is a problem while writing the file
      */
-    final static File saveConfigurationByType(
-            ControllerConfiguration configuration)
-    throws IOException
-    {
+    public final static File saveConfigurationByType(final ControllerConfiguration configuration)
+    throws IOException {
         return saveConfigurationByType(configuration, null);
     }
 
@@ -216,13 +207,11 @@ final class ConfigurationManager
      * @see #loadConfigurationByType(Controller, String)
      * @throws IOException if there is a problem while writing the file
      */
-    final static File saveConfigurationByType(
-            ControllerConfiguration configuration, String namespace)
-    throws IOException
-    {
-        File destinationFile = new File(
-                inferConfigFilePath(
-                        configuration.getController(), namespace));
+    public final static File saveConfigurationByType(
+            final ControllerConfiguration configuration, final String namespace)
+    throws IOException {
+        final File destinationFile = new File(inferConfigFilePath(
+                configuration.getController(), namespace));
         saveConfiguration(configuration, destinationFile);
         return destinationFile;
     }
@@ -243,29 +232,33 @@ final class ConfigurationManager
      * @see #loadConfiguration(Controller, File)
      * @throws IOException if there is a problem while writing the file
      */
-    final static void saveConfiguration(
-            ControllerConfiguration configuration, File destinationFile)
-    throws IOException
-    {
-        File parentDirectory = destinationFile.getParentFile();
-        if (parentDirectory != null && !parentDirectory.exists())
-        {
+    public final static void saveConfiguration(
+            final ControllerConfiguration configuration, final File destinationFile)
+    throws IOException {
+        final File parentDirectory = destinationFile.getParentFile();
+        if (parentDirectory != null && !parentDirectory.exists()) {
             // Make directories first if necessary
             parentDirectory.mkdirs();
         }
 
-        Map<String,String> asMap = configuration.saveToMap(
+        final Map<String,String> asMap = configuration.saveToMap(
                 STANDARD_PREFIX, null);
-        asMap.put(STANDARD_PREFIX + ".majorVersion",
-                Integer.toString(MAJOR_VERSION));
-        asMap.put(STANDARD_PREFIX + ".minorVersion",
-                Integer.toString(MINOR_VERSION));
+        asMap.put(STANDARD_PREFIX + ".majorVersion", Integer.toString(MAJOR_VERSION));
+        asMap.put(STANDARD_PREFIX + ".minorVersion", Integer.toString(MINOR_VERSION));
 
-        Properties asProperties = new Properties();
+        final Properties asProperties = new Properties();
         asProperties.putAll(asMap);
-        FileOutputStream fileOutput = new FileOutputStream(
-                destinationFile, false);
-        asProperties.storeToXML(fileOutput, getDefaultComment());
+        final FileOutputStream fileOutput = new FileOutputStream(destinationFile, false);
+        try {
+            asProperties.storeToXML(fileOutput, getDefaultComment());
+        } finally {
+            try {
+                fileOutput.flush();
+                fileOutput.close();
+            } catch (Exception e) {
+                // Nothing to do.
+            }
+        }
     }
 
     /**
@@ -291,10 +284,8 @@ final class ConfigurationManager
      * or cannot be interpreted due to a version mismatch (i.e., trying to
      * read a configuration generated by a newer major version of this library)
      */
-    final static ControllerConfiguration loadConfigurationByType(
-            NiceController controller)
-    throws IOException, ConfigurationException
-    {
+    public final static ControllerConfiguration loadConfigurationByType(final NiceController controller)
+    throws IOException, ConfigurationException {
         return loadConfigurationByType(controller, null);
     }
 
@@ -322,12 +313,10 @@ final class ConfigurationManager
      * or cannot be interpreted due to a version mismatch (i.e., trying to
      * read a configuration generated by a newer major version of this library)
      */
-    final static ControllerConfiguration loadConfigurationByType(
-            NiceController controller, String namespace)
-    throws IOException, ConfigurationException
-    {
-        File sourceFile = new File(
-                inferConfigFilePath(controller, namespace));
+    public final static ControllerConfiguration loadConfigurationByType(
+            final NiceController controller, final String namespace)
+    throws IOException, ConfigurationException {
+        final File sourceFile = new File(inferConfigFilePath(controller, namespace));
         return loadConfiguration(controller, sourceFile);
     }
 
@@ -351,77 +340,67 @@ final class ConfigurationManager
      * or cannot be interpreted due to a version mismatch (i.e., trying to
      * read a configuration generated by a newer major version of this library)
      */
-    final static ControllerConfiguration loadConfiguration(
-            NiceController controller, File sourceFile)
+    public final static ControllerConfiguration loadConfiguration(
+            final NiceController controller, final File sourceFile)
     throws IOException, ConfigurationException
     {
-        Properties asProperties = new Properties();
-        FileInputStream fileInput = new FileInputStream(sourceFile);
-        asProperties.loadFromXML(fileInput);
-        Map<String,String> asMap = new HashMap<String, String>();
-        try
-        {
-            for (Map.Entry<Object, Object> property : asProperties.entrySet())
-            {
-                // java.util.Properties is a Map<Object,Object>, but we know
-                // for certain that every entry we loaded came from a file
-                // we own the format of.  Every entry will be a <String,String>
-                // tuple.  Therefore, this is safe.
-                asMap.put((String) property.getKey(),
-                        (String) property.getValue());
+        final Properties asProperties = new Properties();
+        final FileInputStream fileInput = new FileInputStream(sourceFile);
+        try {
+            asProperties.loadFromXML(fileInput);
+        } finally {
+            try {
+                fileInput.close();
+            } catch (Exception e) {
+                // Ignore
             }
         }
-        catch(ClassCastException e)
+
+        final Map<String,String> asMap = new HashMap<String, String>();
+        for (Map.Entry<Object, Object> property : asProperties.entrySet())
         {
-            throw new ConfigurationException(
-                    "Configuration file is corrupt: " + sourceFile, e);
+            // java.util.Properties is a Map<Object,Object>, but we know
+            // for certain that every entry we loaded came from a file
+            // we own the format of.  Every entry will be a <String,String>
+            // tuple.  Therefore, this is safe.
+            asMap.put((String) property.getKey(), (String) property.getValue());
         }
 
         // Confirm major version compatibility...
-        String majorVersionString = asMap.get(
-                STANDARD_PREFIX + ".majorVersion");
-        if (majorVersionString == null)
-        {
+        final String majorVersionString = asMap.get(STANDARD_PREFIX + ".majorVersion");
+        if (majorVersionString == null) {
             throw new ConfigurationException(
                     "No major version listed in configuration file: "
                     + sourceFile);
         }
 
-        String minorVersionString = asMap.get(
+        final String minorVersionString = asMap.get(
                 STANDARD_PREFIX + ".minorVersion");
-        if (minorVersionString == null)
-        {
+        if (minorVersionString == null) {
             throw new ConfigurationException(
                     "No minor version listed in configuration file: "
                     + sourceFile);
         }
 
         final int fileMajorVersion;
-        try
-        {
+        try {
             fileMajorVersion = Integer.parseInt(majorVersionString, 10);
-        }
-        catch(NumberFormatException e)
-        {
+        } catch(NumberFormatException e) {
             throw new ConfigurationException(
                     "Major version listed in configuration file '"
                     + sourceFile + "' is corrupt: " + majorVersionString, e);
         }
 
         final int fileMinorVersion;
-        try
-        {
+        try {
             fileMinorVersion = Integer.parseInt(minorVersionString, 10);
-        }
-        catch(NumberFormatException e)
-        {
+        } catch(NumberFormatException e) {
             throw new ConfigurationException(
                     "Minor version listed in configuration file '"
                     + sourceFile + "' is corrupt: " + minorVersionString, e);
         }
 
-        if (fileMajorVersion > MAJOR_VERSION)
-        {
+        if (fileMajorVersion > MAJOR_VERSION) {
             throw new ConfigurationException(
                     "Specified configuration file '"
                     + sourceFile + "' was output in format "
@@ -433,14 +412,11 @@ final class ConfigurationManager
 
         // Check type codes
         final int loadedFingerprint;
-        try
-        {
+        try {
             loadedFingerprint =
                 ControllerConfiguration.readControllerFingerprintFromMap(
                         STANDARD_PREFIX, asMap);
-        }
-        catch(ConfigurationException e)
-        {
+        } catch(ConfigurationException e) {
             throw new ConfigurationException(
                     "Specified configuration file '" + sourceFile
                     + "' doesn't declare a controller fingerprint.");
@@ -448,8 +424,7 @@ final class ConfigurationManager
 
         final int fingerprint = controller.getFingerprint();
 
-        if (fingerprint != loadedFingerprint)
-        {
+        if (fingerprint != loadedFingerprint) {
             throw new ConfigurationException(
                     "Controller fingerprint mismatch: actual != loaded: "
                     + fingerprint + " != " + loadedFingerprint
@@ -459,8 +434,7 @@ final class ConfigurationManager
         }
 
         // Got this far?  Everything looks good.  Go for it!
-        ControllerConfiguration configuration =
-            new ControllerConfiguration(controller);
+        final ControllerConfiguration configuration = new ControllerConfiguration(controller);
         configuration.loadFromMap(STANDARD_PREFIX, asMap);
         return configuration;
     }
