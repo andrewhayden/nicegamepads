@@ -141,7 +141,7 @@ public class ControlConfiguration
     /**
      * Creates a new, empty configuration with default values.
      */
-    public ControlConfiguration(ControlConfigurationBuilder builder)
+    public ControlConfiguration(final ControlConfigurationBuilder builder)
     {
         this.control = builder.getControl();
         this.centerValueOverride = builder.getCenterValueOverride();

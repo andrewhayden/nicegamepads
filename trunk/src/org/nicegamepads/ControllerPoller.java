@@ -88,27 +88,21 @@ public final class ControllerPoller
      * 
      * @param controller the controller to be polled
      */
-    private ControllerPoller(NiceController controller)
-    {
+    private ControllerPoller(NiceController controller) {
         this.controller = controller;
         this.controllerState = new ControllerState(controller);
         pollingInvoker = new PollingInvoker(this);
     }
 
-    private final void init()
-    {
+    private final void init() {
         // By default, start polling 60x per second
         startPolling(1000L / 60L, TimeUnit.MILLISECONDS);
     }
 
-    public final static ControllerPoller getInstance(NiceController controller)
-    {
-        synchronized(pollersByController)
-        {
-            ControllerPoller instance =
-                pollersByController.get(controller);
-            if (instance == null)
-            {
+    public final static ControllerPoller getInstance(NiceController controller) {
+        synchronized(pollersByController) {
+            ControllerPoller instance = pollersByController.get(controller);
+            if (instance == null) {
                 instance = new ControllerPoller(controller);
                 instance.init();
                 pollersByController.put(controller, instance);
@@ -121,8 +115,7 @@ public final class ControllerPoller
      * Requests that <strong>all</strong> polling cease in the near future.
      * Events that are currently enqueued are allowed to start and complete.
      */
-    final static void shutdownAllPolling()
-    {
+    final static void shutdownAllPolling() {
         ControllerManager.getPollingService().shutdown();
     }
 
@@ -131,8 +124,7 @@ public final class ControllerPoller
      * All currently-executing events are asked to halt (via interrupt)
      * and all enqueued events are dropped on the floor.
      */
-    final static void shutdownAllPollingNow()
-    {
+    final static void shutdownAllPollingNow() {
         ControllerManager.getPollingService().shutdownNow();
     }
 
@@ -146,8 +138,7 @@ public final class ControllerPoller
      * @throws InterruptedException if interrupted while waiting
      */
     final static boolean awaitTermination(long timeout, TimeUnit unit)
-    throws InterruptedException
-    {
+    throws InterruptedException {
         return ControllerManager.getPollingService().awaitTermination(timeout, unit);
     }
 
@@ -164,17 +155,15 @@ public final class ControllerPoller
     private final static float[] getGranularityBins(float granularity)
     {
         float[] bins = granularityBinsByGranularity.get(granularity);
-        if (bins != null)
-        {
+        if (bins != null) {
             // Cached.  Return this immediately.
             return bins;
         }
 
-        List<Float> listing = new LinkedList<Float>();
+        final List<Float> listing = new LinkedList<Float>();
         int counter = 1;
         float currentValue = 0f;
-        while (currentValue > -1.0f)
-        {
+        while (currentValue > -1.0f) {
             currentValue = 0f - (((float) counter) * granularity);
             listing.add(0, currentValue);
             counter++;
@@ -182,8 +171,7 @@ public final class ControllerPoller
         listing.add(0f);
         counter = 1;
         currentValue = 0f;
-        while (currentValue < 1.0f)
-        {
+        while (currentValue < 1.0f) {
             currentValue = ((float) counter) * granularity;
             listing.add(currentValue);
             counter++;
@@ -191,8 +179,7 @@ public final class ControllerPoller
 
         bins = new float[listing.size()];
         counter = 0;
-        for (Float f : listing)
-        {
+        for (Float f : listing) {
             bins[counter++] = f;
         }
 
@@ -213,12 +200,9 @@ public final class ControllerPoller
      * @param interval the interval at which to poll
      * @param unit the time unit for the interval
      */
-    private final void startPolling(long interval, TimeUnit unit)
-    {
-        synchronized(pollingInvoker)
-        {
-            if (pollingTask != null)
-            {
+    private final void startPolling(final long interval, final TimeUnit unit) {
+        synchronized(pollingInvoker) {
+            if (pollingTask != null) {
                 pollingTask.cancel(false);
             }
             pollingTask = ControllerManager.getPollingService().scheduleAtFixedRate(
@@ -235,12 +219,9 @@ public final class ControllerPoller
      * to guarantee that polling has terminated by the time this call
      * returns, use {@link #stopPollingAndWait(long, TimeUnit)} instead.
      */
-    final void stopPolling()
-    {
-        synchronized(pollingInvoker)
-        {
-            if (pollingTask != null)
-            {
+    final void stopPolling() {
+        synchronized(pollingInvoker) {
+            if (pollingTask != null) {
                 pollingTask.cancel(false);
             }
             pollingTask = null;
@@ -254,21 +235,15 @@ public final class ControllerPoller
      * polling events will be enqueued for dispatch (any unprocessed
      * events will still be fired).
      */
-    final void stopPollingAndWait(long interval, TimeUnit unit)
-    throws InterruptedException, ExecutionException, TimeoutException
-    {
-        synchronized(pollingInvoker)
-        {
-            try
-            {
-                if (pollingTask != null)
-                {
+    final void stopPollingAndWait(final long interval, final TimeUnit unit)
+    throws InterruptedException, ExecutionException, TimeoutException {
+        synchronized(pollingInvoker) {
+            try {
+                if (pollingTask != null) {
                     pollingTask.cancel(false);
                     pollingTask.get(interval, unit);
                 }
-            }
-            finally
-            {
+            } finally {
                 pollingTask = null;
             }
         }
@@ -282,15 +257,13 @@ public final class ControllerPoller
      * @throws IllegalStateException if no configuration has been set for
      * this poller
      */
-    private final void poll()
-    {
+    private final void poll() {
         // Start by obtaining a copy of the current configuration.  We will
         // use only this copy for our entire method lifetime.
         // Since the source is volatile we are guaranteed that we are getting
         // the latest copy here.
         final ControllerConfiguration config = controller.getConfiguration();
-        if (config == null)
-        {
+        if (config == null) {
             throw new IllegalStateException("Null configuration.");
         }
 
@@ -299,49 +272,37 @@ public final class ControllerPoller
         controllerState.timestamp = now;
 
         // Poll the controller
-        try
-        {
+        try {
             config.getController().pollAllControls(controllerState);
-        }
-        catch(ControllerException e)
-        {
+        } catch(ControllerException e) {
             // FIXME: raise event!
             e.printStackTrace();
             stopPolling();
         }
 
         // Process each control.
-        for (ControlState state : controllerState.controlStates)
-        {
+        for (ControlState state : controllerState.controlStates) {
             // Look up configuration for this control
             controlConfig = config.getConfiguration(state.control);
             // Poll the value
             float polledValue = state.rawCurrentValue;
             // Transform according to configuration rules
-            polledValue = transform(
-                    polledValue, controlConfig, state.control.getControlType());
+            polledValue = transform(polledValue, controlConfig, state.control.getControlType());
             // Get any user ID bound to this value
             boolean forceFireTurboEvent = false;
 
-            switch (state.control.getControlType())
-            {
+            switch (state.control.getControlType()) {
                 case DISCRETE_INPUT:
                     state.newValue(polledValue, now, polledValue == 1f);
                     // Check for turbo stuff
-                    if (controlConfig.isTurboEnabled() && polledValue == 1f)
-                    {
-                        if (controlConfig.getTurboDelayMillis() == 0)
-                        {
+                    if (controlConfig.isTurboEnabled() && polledValue == 1f) {
+                        if (controlConfig.getTurboDelayMillis() == 0) {
                             // If button is pressed, force an event.
                             forceFireTurboEvent = true;
-                        }
-                        else if (state.lastTurboTimerStart > 0)
-                        {
+                        } else if (state.lastTurboTimerStart > 0) {
                             // There is a specific delay for turbo and the
                             // timer is running.  Has enough time gone by?
-                            if (now - state.lastTurboTimerStart >=
-                                controlConfig.getTurboDelayMillis())
-                            {
+                            if (now - state.lastTurboTimerStart >= controlConfig.getTurboDelayMillis()) {
                                 // Yes.
                                 forceFireTurboEvent = true;
                             }
@@ -360,40 +321,28 @@ public final class ControllerPoller
             // Figure out which events need to be fired.
 
             // Start with activation/deactivation events:
-            if (event.previousValueId != Integer.MIN_VALUE
-                    && event.currentValueId != Integer.MIN_VALUE)
-            {
+            if (event.previousValueId != Integer.MIN_VALUE && event.currentValueId != Integer.MIN_VALUE) {
                 // Both values are bound.
-                if (event.previousValueId != event.currentValueId)
-                {
+                if (event.previousValueId != event.currentValueId) {
                     // Previous id deactivated.
                     dispatchControlDeactivated(event);
                     // Current id activated
                     dispatchControlActivated(event);
-                }
-                else
-                {
+                } else {
                     // Previous id is still active.
-                    if (forceFireTurboEvent)
-                    {
+                    if (forceFireTurboEvent) {
                         // Turbo mode engaged.  Force an event to fire even
                         // though nothing has really changed.
                         dispatchControlActivated(event);
                     }
                 }
-            }
-            else if (event.previousValueId != Integer.MIN_VALUE)
-            {
+            } else if (event.previousValueId != Integer.MIN_VALUE) {
                 // Previous value is bound but current value isn't.
                 dispatchControlDeactivated(event);
-            }
-            else if (event.currentValueId != Integer.MIN_VALUE)
-            {
+            } else if (event.currentValueId != Integer.MIN_VALUE) {
                 // Current value is bound but previous value isn't.
                 dispatchControlActivated(event);
-            }
-            else
-            {
+            } else {
                 // Neither the current nor the previous value is bound
                 // No-op (only thing that can happen is a change event,
                 // which we don't test by ID since IDs aren't guaranteed
@@ -401,8 +350,7 @@ public final class ControllerPoller
             }
 
             // Check for a value change and fire event if the value has changed
-            if (event.previousValue != event.currentValue)
-            {
+            if (event.previousValue != event.currentValue) {
                 dispatchValueChanged(event);
             }
 
@@ -415,8 +363,7 @@ public final class ControllerPoller
         // controller state can be a relatively expensive operation.  If
         // nobody is listening, it will be slightly less resource-intensive
         // to simply skip cloning the state.
-        if (controllerPollingListeners.size() > 0)
-        {
+        if (controllerPollingListeners.size() > 0) {
             ControllerState stateCopy = new ControllerState(controllerState);
             dispatchControllerPolled(stateCopy);
         }
@@ -431,17 +378,13 @@ public final class ControllerPoller
      * @param the type of control
      * @return the post-transform result for the value
      */
-    private final float transform(float polledValue,
-            ControlConfiguration controlConfig, NiceControlType controlType)
-    {
+    private final float transform(float polledValue, final ControlConfiguration controlConfig, final NiceControlType controlType) {
         // STEP 1: Granularity
         // Get granularity bins and collapse.
-        if (!Float.isNaN(controlConfig.getGranularity()))
-        {
-            float[] bins = getGranularityBins(controlConfig.getGranularity());
+        if (!Float.isNaN(controlConfig.getGranularity())) {
+            final float[] bins = getGranularityBins(controlConfig.getGranularity());
             int index = Arrays.binarySearch(bins, polledValue);
-            if (index < 0)
-            {
+            if (index < 0) {
                 // Value isn't an exact match to any bin, so we must clamp
                 // it to the bin boundary nearest to zero
                 // Index returned by binary search is
@@ -463,63 +406,46 @@ public final class ControllerPoller
         }
 
         // STEP 2: Dead zone
-        if (!Float.isNaN(controlConfig.getDeadZoneLowerBound()))
-        {
+        if (!Float.isNaN(controlConfig.getDeadZoneLowerBound())) {
             // We have a dead zone to consider.
-            if (controlConfig.getDeadZoneLowerBound() <= polledValue
-                    && polledValue <= controlConfig.getDeadZoneUpperBound())
-            {
+            if (controlConfig.getDeadZoneLowerBound() <= polledValue && polledValue <= controlConfig.getDeadZoneUpperBound()) {
                 // Value is in the dead zone.  Set to zero.
                 polledValue = 0f;
             }
         }
 
         // STEP 3: Inversion
-        if (controlConfig.isInverted())
-        {
-            if (controlType == NiceControlType.DISCRETE_INPUT)
-            {
+        if (controlConfig.isInverted()) {
+            if (controlType == NiceControlType.DISCRETE_INPUT) {
                 // FIXME: need to correct this behavior.
                 // Buttons should be treated specially... this was originally
                 // for buttons when buttons existed as a type
 
                 // Reflect around 0.5f
                 polledValue = 1f - polledValue;
-            }
-            else
-            {
+            } else {
                 // Reflect around 0f
                 polledValue *= -1f;
             }
         }
 
         // STEP 4: Recentering
-        if (!Float.isNaN(controlConfig.getCenterValueOverride())
-                && controlConfig.getCenterValueOverride() != 0f)
-        {
+        if (!Float.isNaN(controlConfig.getCenterValueOverride()) && controlConfig.getCenterValueOverride() != 0f) {
             float positiveExpansion;
             float negativeExpansion;
-            if (controlConfig.getCenterValueOverride() > 0f)
-            {
+            if (controlConfig.getCenterValueOverride() > 0f) {
                 positiveExpansion = 1f - controlConfig.getCenterValueOverride();
                 negativeExpansion = 1f + controlConfig.getCenterValueOverride();
-            }
-            else
-            {
+            } else {
                 negativeExpansion = 1f - Math.abs(controlConfig.getCenterValueOverride());
                 positiveExpansion = 1f - controlConfig.getCenterValueOverride();
             }
 
-            if (polledValue > 0)
-            {
+            if (polledValue > 0) {
                 polledValue *= positiveExpansion;
-            }
-            else if (polledValue < 0)
-            {
+            } else if (polledValue < 0) {
                 polledValue *= negativeExpansion;
-            }
-            else
-            {
+            } else {
                 polledValue = controlConfig.getCenterValueOverride();
             }
         }
@@ -528,12 +454,9 @@ public final class ControllerPoller
         // We don't expect to get out of this range because of any errors
         // in the code, but rather it is possible because of floating point
         // precision loss.
-        if (polledValue < -1.0f)
-        {
+        if (polledValue < -1.0f) {
             polledValue = -1.0f;
-        }
-        else if (polledValue > 1.0f)
-        {
+        } else if (polledValue > 1.0f) {
             polledValue = 1.0f;
         }
 
@@ -559,9 +482,7 @@ public final class ControllerPoller
      * 
      * @param listener the listener to add.
      */
-    final void addControlActivationListener(
-            ControlActivationListener listener)
-    {
+    public final void addControlActivationListener(final ControlActivationListener listener) {
         activationListeners.add(listener);
     }
 
@@ -570,9 +491,7 @@ public final class ControllerPoller
      * 
      * @param listener the listener to be removed
      */
-    final void removeControlActivationListener(
-            ControlActivationListener listener)
-    {
+    public final void removeControlActivationListener(final ControlActivationListener listener) {
         activationListeners.remove(listener);
     }
 
@@ -594,9 +513,7 @@ public final class ControllerPoller
      * 
      * @param listener the listener to add.
      */
-    final void addControlChangeListener(
-            ControlChangeListener listener)
-    {
+    public final void addControlChangeListener(ControlChangeListener listener) {
         changeListeners.add(listener);
     }
 
@@ -605,9 +522,7 @@ public final class ControllerPoller
      * 
      * @param listener the listener to be removed
      */
-    final void removeControlChangeListener(
-            ControlChangeListener listener)
-    {
+    public final void removeControlChangeListener(final ControlChangeListener listener) {
         changeListeners.remove(listener);
     }
 
@@ -629,9 +544,7 @@ public final class ControllerPoller
      * 
      * @param listener the listener to add.
      */
-    public final void addControlPollingListener(
-            ControlPollingListener listener)
-    {
+    public final void addControlPollingListener(final ControlPollingListener listener) {
         controlPollingListeners.add(listener);
     }
 
@@ -640,9 +553,7 @@ public final class ControllerPoller
      * 
      * @param listener the listener to be removed
      */
-    public final void removeControlPollingListener(
-            ControlPollingListener listener)
-    {
+    public final void removeControlPollingListener(final ControlPollingListener listener) {
         controlPollingListeners.remove(listener);
     }
 
@@ -664,9 +575,7 @@ public final class ControllerPoller
      * 
      * @param listener the listener to add.
      */
-    final void addControllerPollingListener(
-            ControllerPollingListener listener)
-    {
+    public final void addControllerPollingListener(final ControllerPollingListener listener) {
         controllerPollingListeners.add(listener);
     }
 
@@ -675,9 +584,7 @@ public final class ControllerPoller
      * 
      * @param listener the listener to be removed
      */
-    final void removeControllerPollingListener(
-            ControllerPollingListener listener)
-    {
+    public final void removeControllerPollingListener(final ControllerPollingListener listener) {
         controllerPollingListeners.remove(listener);
     }
 
@@ -688,9 +595,7 @@ public final class ControllerPoller
      * @param config the config associated with the control
      * @return the event
      */
-    private final static ControlEvent makeEvent(
-            ControlState state, ControlConfiguration config)
-    {
+    private final static ControlEvent makeEvent(final ControlState state, final ControlConfiguration config) {
         return new ControlEvent(
                 state.control.getController(),
                 state.control, config.getUserDefinedId(),
@@ -704,14 +609,11 @@ public final class ControllerPoller
      * 
      * @param event the event to be dispatched
      */
-    private final void dispatchControlActivated(final ControlEvent event)
-    {
+    private final void dispatchControlActivated(final ControlEvent event) {
         ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
             @Override
-            protected void runInternal()
-            {
-                for (ControlActivationListener listener : activationListeners)
-                {
+            protected void runInternal() {
+                for (ControlActivationListener listener : activationListeners) {
                     listener.controlActivated(event);
                 }
             }
@@ -724,14 +626,11 @@ public final class ControllerPoller
      * 
      * @param event the event to be dispatched
      */
-    private final void dispatchControlDeactivated(final ControlEvent event)
-    {
+    private final void dispatchControlDeactivated(final ControlEvent event) {
         ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
             @Override
-            protected void runInternal()
-            {
-                for (ControlActivationListener listener : activationListeners)
-                {
+            protected void runInternal() {
+                for (ControlActivationListener listener : activationListeners) {
                     listener.controlDeactivated(event);
                 }
             }
@@ -744,14 +643,11 @@ public final class ControllerPoller
      * 
      * @param event the event to be dispatched
      */
-    private final void dispatchValueChanged(final ControlEvent event)
-    {
+    private final void dispatchValueChanged(final ControlEvent event) {
         ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
             @Override
-            protected void runInternal()
-            {
-                for (ControlChangeListener listener : changeListeners)
-                {
+            protected void runInternal() {
+                for (ControlChangeListener listener : changeListeners) {
                     listener.valueChanged(event);
                 }
             }
@@ -764,14 +660,11 @@ public final class ControllerPoller
      * 
      * @param event the event to be dispatched
      */
-    private final void dispatchControlPolled(final ControlEvent event)
-    {
+    private final void dispatchControlPolled(final ControlEvent event) {
         ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
             @Override
-            protected void runInternal()
-            {
-                for (ControlPollingListener listener : controlPollingListeners)
-                {
+            protected void runInternal() {
+                for (ControlPollingListener listener : controlPollingListeners) {
                     listener.controlPolled(event);
                 }
             }
@@ -784,14 +677,11 @@ public final class ControllerPoller
      * 
      * @param state the state to be dispatched
      */
-    private final void dispatchControllerPolled(final ControllerState state)
-    {
+    private final void dispatchControllerPolled(final ControllerState state) {
         ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
             @Override
-            protected void runInternal()
-            {
-                for (ControllerPollingListener listener : controllerPollingListeners)
-                {
+            protected void runInternal() {
+                for (ControllerPollingListener listener : controllerPollingListeners) {
                     listener.controllerPolled(state);
                 }
             }
@@ -803,8 +693,7 @@ public final class ControllerPoller
      * 
      * @author Andrew Hayden
      */
-    private final static class PollingInvoker extends LoggingRunnable
-    {
+    private final static class PollingInvoker extends LoggingRunnable {
         /**
          * The poller to invoke polling on.
          */
@@ -816,14 +705,12 @@ public final class ControllerPoller
          * 
          * @param poller the poller to invoke polling on
          */
-        PollingInvoker (ControllerPoller poller)
-        {
+        PollingInvoker (final ControllerPoller poller) {
             this.poller = poller;
         }
 
         @Override
-        protected final void runInternal()
-        {
+        protected final void runInternal() {
             poller.poll();
         }
     }
