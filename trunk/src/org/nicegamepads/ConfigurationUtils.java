@@ -2,13 +2,21 @@ package org.nicegamepads;
 
 import java.util.Map;
 
+/**
+ * Utilities for working with our configuration objects.  This is nontrivial
+ * because we store floats and such in properties files, which means we have
+ * to have canonical representations of them in non-obvious form.
+ * <p>
+ * This class is threadsafe.
+ * 
+ * @author ahayden
+ */
 final class ConfigurationUtils
 {
     /**
      * Private constructor discourages unwanted instantiation.
      */
-    private ConfigurationUtils()
-    {
+    private ConfigurationUtils() {
         // Private constructor discourages unwanted instantiation.
     }
 
@@ -24,21 +32,16 @@ final class ConfigurationUtils
      * @throws ConfigurationException if the value is not found or if the
      * value cannot be parsed as expected
      */
-    final static float getFloat(Map<String,String> map, String key)
-    throws ConfigurationException
-    {
-        String value = map.get(key);
-        if (value == null)
-        {
+    public final static float getFloat(final Map<String,String> map, final String key)
+    throws ConfigurationException {
+        final String value = map.get(key);
+        if (value == null) {
             throw new ConfigurationException("No such key: " + key);
         }
 
-        try
-        {
+        try {
             return floatFromHexBitString(value);
-        }
-        catch(NumberFormatException e)
-        {
+        } catch(NumberFormatException e) {
             throw new ConfigurationException("Configuration is corrupt.  Key '"
                     + key + "' should refer to Float, but instead refers to "
                     + "value '" + value + "'");
@@ -60,22 +63,16 @@ final class ConfigurationUtils
      * @throws ConfigurationException if the
      * value cannot be parsed as expected
      */
-    final static float getFloat(Map<String,String> map, String key,
-            float defaultValue)
-    throws ConfigurationException
-    {
-        String value = map.get(key);
-        if (value == null)
-        {
+    public final static float getFloat(final Map<String,String> map, final String key, final float defaultValue)
+    throws ConfigurationException {
+        final String value = map.get(key);
+        if (value == null) {
             return defaultValue;
         }
 
-        try
-        {
+        try {
             return floatFromHexBitString(value);
-        }
-        catch(NumberFormatException e)
-        {
+        } catch(NumberFormatException e) {
             throw new ConfigurationException("Configuration is corrupt.  Key '"
                     + key + "' should refer to Float, but instead refers to "
                     + "value '" + value + "'");
@@ -91,25 +88,18 @@ final class ConfigurationUtils
      * @throws ConfigurationException if the value is not found or if the
      * value cannot be parsed as expected
      */
-    final static boolean getBoolean(Map<String,String> map, String key)
-    throws ConfigurationException
-    {
-        String value = map.get(key);
-        if (value == null)
-        {
+    public final static boolean getBoolean(final Map<String,String> map, final String key)
+    throws ConfigurationException {
+        final String value = map.get(key);
+        if (value == null) {
             throw new ConfigurationException("No such key: " + key);
         }
 
-        if (value.equalsIgnoreCase("true"))
-        {
+        if (value.equalsIgnoreCase("true")) {
             return true;
-        }
-        else if (value.equalsIgnoreCase("false"))
-        {
+        } else if (value.equalsIgnoreCase("false")) {
             return false;
-        }
-        else
-        {
+        } else {
             throw new ConfigurationException("Configuration is corrupt.  Key '"
                     + key + "' should refer to Boolean, but instead refers to "
                     + "value '" + value + "'");
@@ -128,26 +118,18 @@ final class ConfigurationUtils
      * @throws ConfigurationException if the
      * value cannot be parsed as expected
      */
-    final static boolean getBoolean(Map<String,String> map, String key,
-            boolean defaultValue)
-    throws ConfigurationException
-    {
-        String value = map.get(key);
-        if (value == null)
-        {
+    public final static boolean getBoolean(final Map<String,String> map, final String key, final boolean defaultValue)
+    throws ConfigurationException {
+        final String value = map.get(key);
+        if (value == null) {
             return defaultValue;
         }
 
-        if (value.equalsIgnoreCase("true"))
-        {
+        if (value.equalsIgnoreCase("true")) {
             return true;
-        }
-        else if (value.equalsIgnoreCase("false"))
-        {
+        } else if (value.equalsIgnoreCase("false")) {
             return false;
-        }
-        else
-        {
+        } else {
             throw new ConfigurationException("Configuration is corrupt.  Key '"
                     + key + "' should refer to Boolean, but instead refers to "
                     + "value '" + value + "'");
@@ -163,12 +145,10 @@ final class ConfigurationUtils
      * @throws ConfigurationException if the value is not found or if the
      * value cannot be parsed as expected
      */
-    final static String getString(Map<String,String> map, String key)
-    throws ConfigurationException
-    {
-        String value = map.get(key);
-        if (value == null)
-        {
+    public final static String getString(final Map<String,String> map, final String key)
+    throws ConfigurationException {
+        final String value = map.get(key);
+        if (value == null) {
             throw new ConfigurationException("No such key: " + key);
         }
         return value;
@@ -184,12 +164,10 @@ final class ConfigurationUtils
      * @return the value bound to the specified key, or the default value
      * otherwise
      */
-    final static String getString(Map<String,String> map, String key,
-            String defaultValue)
+    public final static String getString(final Map<String,String> map, final String key, final String defaultValue)
     {
-        String value = map.get(key);
-        if (value == null)
-        {
+        final String value = map.get(key);
+        if (value == null) {
             return defaultValue;
         }
         return value;
@@ -204,21 +182,16 @@ final class ConfigurationUtils
      * @throws ConfigurationException if the value is not found or if the
      * value cannot be parsed as expected
      */
-    final static int getInteger(Map<String,String> map, String key)
-    throws ConfigurationException
-    {
-        String value = map.get(key);
-        if (value == null)
-        {
+    public final static int getInteger(final Map<String,String> map, final String key)
+    throws ConfigurationException {
+        final String value = map.get(key);
+        if (value == null) {
             throw new ConfigurationException("No such key: " + key);
         }
 
-        try
-        {
+        try {
             return Integer.parseInt(value);
-        }
-        catch(NumberFormatException e)
-        {
+        } catch(NumberFormatException e) {
             throw new ConfigurationException("Configuration is corrupt.  Key '"
                     + key + "' should refer to Integer, but instead refers to "
                     + "value '" + value + "'");
@@ -237,22 +210,16 @@ final class ConfigurationUtils
      * @throws ConfigurationException if the
      * value cannot be parsed as expected
      */
-    final static int getInteger(Map<String,String> map, String key,
-            int defaultValue)
-    throws ConfigurationException
-    {
-        String value = map.get(key);
-        if (value == null)
-        {
+    public final static int getInteger(final Map<String,String> map, final String key, final int defaultValue)
+    throws ConfigurationException {
+        final String value = map.get(key);
+        if (value == null) {
             return defaultValue;
         }
 
-        try
-        {
+        try {
             return Integer.parseInt(value);
-        }
-        catch(NumberFormatException e)
-        {
+        } catch(NumberFormatException e) {
             throw new ConfigurationException("Configuration is corrupt.  Key '"
                     + key + "' should refer to Integer, but instead refers to "
                     + "value '" + value + "'");
@@ -268,21 +235,17 @@ final class ConfigurationUtils
      * @throws ConfigurationException if the value is not found or if the
      * value cannot be parsed as expected
      */
-    final static long getLong(Map<String,String> map, String key)
+    public final static long getLong(final Map<String,String> map, final String key)
     throws ConfigurationException
     {
-        String value = map.get(key);
-        if (value == null)
-        {
+        final String value = map.get(key);
+        if (value == null) {
             throw new ConfigurationException("No such key: " + key);
         }
 
-        try
-        {
+        try {
             return Long.parseLong(value);
-        }
-        catch(NumberFormatException e)
-        {
+        } catch(NumberFormatException e) {
             throw new ConfigurationException("Configuration is corrupt.  Key '"
                     + key + "' should refer to Long, but instead refers to "
                     + "value '" + value + "'");
@@ -301,22 +264,17 @@ final class ConfigurationUtils
      * @throws ConfigurationException if the
      * value cannot be parsed as expected
      */
-    final static long getLong(Map<String,String> map, String key,
-            long defaultValue)
+    public final static long getLong(final Map<String,String> map, final String key, final long defaultValue)
     throws ConfigurationException
     {
-        String value = map.get(key);
-        if (value == null)
-        {
+        final String value = map.get(key);
+        if (value == null) {
             return defaultValue;
         }
 
-        try
-        {
+        try {
             return Long.parseLong(value);
-        }
-        catch(NumberFormatException e)
-        {
+        } catch(NumberFormatException e) {
             throw new ConfigurationException("Configuration is corrupt.  Key '"
                     + key + "' should refer to Long, but instead refers to "
                     + "value '" + value + "'");
@@ -331,8 +289,7 @@ final class ConfigurationUtils
      * @return a hexadecimal representation of the bit pattern of the floating
      * point value as if it were an unsigned int
      */
-    final static String floatToHexBitString(float value)
-    {
+    public final static String floatToHexBitString(final float value) {
         return Integer.toHexString(Float.floatToRawIntBits(value));
     }
 
@@ -349,22 +306,20 @@ final class ConfigurationUtils
      * against all forms of corruption, since many valid strings will parse
      * to a floating point bit pattern in hex
      */
-    final static float floatFromHexBitString(String value)
-    throws NumberFormatException
-    {
+    public final static float floatFromHexBitString(final String value)
+    throws NumberFormatException {
         long asLong = Long.parseLong(value, 16);
         // 0xFFFFFFFF00000000 is 32 bits of 1's followed bt 32 bits of 0's
         // That is, it is a mask for values greater than the largest possible
         // unsigned 32-bit integer
-        if ( (asLong & 0xFFFFFFFF00000000L) != 0)
-        {
+        if ( (asLong & 0xFFFFFFFF00000000L) != 0) {
             // String contains more than 32 bits of data!
             throw new NumberFormatException(
                     "Bit string representation contains more than 32 bits "
                     + "of data: " + value);
         }
 
-        int lsb = (int) (asLong & 0x1L);
+        final int lsb = (int) (asLong & 0x1L);
         int rawBits = (int) (asLong >> 1);
         rawBits <<= 1;
         rawBits |= lsb;
