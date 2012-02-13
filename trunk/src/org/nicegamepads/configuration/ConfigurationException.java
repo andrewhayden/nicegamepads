@@ -1,4 +1,4 @@
-package org.nicegamepads;
+package org.nicegamepads.configuration;
 
 /**
  * An exception representing a generic configuration error.

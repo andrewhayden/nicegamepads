@@ -4,6 +4,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.nicegamepads.configuration.ControlConfiguration;
+import org.nicegamepads.configuration.ControllerConfiguration;
+import org.nicegamepads.configuration.ControllerConfigurationBuilder;
+import org.nicegamepads.configuration.ControllerConfigurator;
+
 public class VirtualAnalogStickTest
 {
     public final static void main(String[] args)
@@ -13,14 +18,15 @@ public class VirtualAnalogStickTest
 
         NiceController controller = gamepads.get(0);
         System.out.println("gamepad: " + controller.getDeclaredName() + "; fingerprint=" + controller.getFingerprint());
-
-        controller.setAllAnalogDeadZones(-0.1f, 0.1f);
-        controller.setAllAnalogGranularities(0.1f);
-        ControllerConfiguration config = controller.getConfigurationLive();
+        final ControllerConfigurationBuilder configBuilder = new ControllerConfigurationBuilder(controller);
+        configBuilder.loadFrom(controller.getConfiguration());
+        configBuilder.setAllAnalogDeadZones(-0.1f, 0.1f);
+        configBuilder.setAllAnalogGranularities(0.1f);
+        controller.setConfiguration(configBuilder.build());
+        ControllerConfiguration config = controller.getConfiguration();
         System.out.println(config);
 
-        ControllerConfigurator configurator =
-            new ControllerConfigurator(controller);
+        ControllerConfigurator configurator = new ControllerConfigurator(controller);
         
         ControlEvent event = null;
         Set<NiceControl> identifiedControls = new HashSet<NiceControl>();
@@ -37,7 +43,6 @@ public class VirtualAnalogStickTest
             event = configurator.identifyControl(NiceControlType.CONTINUOUS_INPUT, identifiedControls);
             System.out.println("Control identified: " + event);
             controlConfig = config.getConfiguration(event.sourceControl);
-            controlConfig.setUserDefinedId(0);
             identifiedControls.add(event.sourceControl);
             eastWest = event.sourceControl;
             if (event.previousValue > 0)
@@ -55,7 +60,6 @@ public class VirtualAnalogStickTest
             event = configurator.identifyControl(NiceControlType.CONTINUOUS_INPUT, identifiedControls);
             System.out.println("Control identified: " + event);
             controlConfig = config.getConfiguration(event.sourceControl);
-            controlConfig.setUserDefinedId(1);
             identifiedControls.add(event.sourceControl);
             northSouth = event.sourceControl;
             if (event.previousValue > 0)

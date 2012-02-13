@@ -223,16 +223,13 @@ public class VirtualAnalogStick
         // increasing clockwise.  So to get from Java to compass, we
         // need to offset by -90 degrees or -(pi/2)
         float compassDegrees = builder.getDirectionJavaDegrees() + 90f;
-        if (compassDegrees < 0)
-        {
+        if (compassDegrees < 0) {
             compassDegrees += 360f;
         }
         builder.setDirectionCompassDegrees(compassDegrees);
         
-        float compassRadians = (float)
-            (Math.toRadians(builder.getDirectionJavaDegrees()) - (Math.PI / 2d));
-        if (compassRadians < 0)
-        {
+        float compassRadians = (float) (Math.toRadians(builder.getDirectionJavaDegrees()) - (Math.PI / 2d));
+        if (compassRadians < 0) {
             compassRadians += Math.PI * 2d;
         }
         builder.setDirectionCompassRadians(compassRadians);
@@ -270,12 +267,7 @@ public class VirtualAnalogStick
         final float desiredMagnitude = (float) Math.hypot(horizontalValue, verticalValue);
         // Protected against floating point precision loss resulting in
         // overflow beyond the boundary
-        if (builder.getMagnitude() > builder.getMaxMagnitude()) {
-            builder.setMagnitude(builder.getMaxMagnitude());
-        } else {
-            builder.setMagnitude(desiredMagnitude);
-        }
-
+        builder.setMagnitude(Math.min(desiredMagnitude, builder.getMaxMagnitude()));
         return builder.build();
     }
 }

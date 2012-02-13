@@ -12,12 +12,16 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.nicegamepads.configuration.ControlConfiguration;
+import org.nicegamepads.configuration.ControllerConfiguration;
+
 /**
  * Abstracts the polling of a single processor.
  * 
  * @author Andrew Hayden
  */
-final class ControllerPoller
+// FIXME: This class should not enforce itself as a singleton.
+public final class ControllerPoller
 {
     /**
      * The controller this poller polls.
@@ -97,7 +101,7 @@ final class ControllerPoller
         startPolling(1000L / 60L, TimeUnit.MILLISECONDS);
     }
 
-    final static ControllerPoller getInstance(NiceController controller)
+    public final static ControllerPoller getInstance(NiceController controller)
     {
         synchronized(pollersByController)
         {
@@ -284,8 +288,7 @@ final class ControllerPoller
         // use only this copy for our entire method lifetime.
         // Since the source is volatile we are guaranteed that we are getting
         // the latest copy here.
-        final ControllerConfiguration config =
-            controller.getConfigurationCached();
+        final ControllerConfiguration config = controller.getConfiguration();
         if (config == null)
         {
             throw new IllegalStateException("Null configuration.");
@@ -325,9 +328,9 @@ final class ControllerPoller
                 case DISCRETE_INPUT:
                     state.newValue(polledValue, now, polledValue == 1f);
                     // Check for turbo stuff
-                    if (controlConfig.isTurboEnabled && polledValue == 1f)
+                    if (controlConfig.isTurboEnabled() && polledValue == 1f)
                     {
-                        if (controlConfig.turboDelayMillis == 0)
+                        if (controlConfig.getTurboDelayMillis() == 0)
                         {
                             // If button is pressed, force an event.
                             forceFireTurboEvent = true;
@@ -337,7 +340,7 @@ final class ControllerPoller
                             // There is a specific delay for turbo and the
                             // timer is running.  Has enough time gone by?
                             if (now - state.lastTurboTimerStart >=
-                                controlConfig.turboDelayMillis)
+                                controlConfig.getTurboDelayMillis())
                             {
                                 // Yes.
                                 forceFireTurboEvent = true;
@@ -433,9 +436,9 @@ final class ControllerPoller
     {
         // STEP 1: Granularity
         // Get granularity bins and collapse.
-        if (!Float.isNaN(controlConfig.granularity))
+        if (!Float.isNaN(controlConfig.getGranularity()))
         {
-            float[] bins = getGranularityBins(controlConfig.granularity);
+            float[] bins = getGranularityBins(controlConfig.getGranularity());
             int index = Arrays.binarySearch(bins, polledValue);
             if (index < 0)
             {
@@ -460,11 +463,11 @@ final class ControllerPoller
         }
 
         // STEP 2: Dead zone
-        if (!Float.isNaN(controlConfig.deadZoneLowerBound))
+        if (!Float.isNaN(controlConfig.getDeadZoneLowerBound()))
         {
             // We have a dead zone to consider.
-            if (controlConfig.deadZoneLowerBound <= polledValue
-                    && polledValue <= controlConfig.deadZoneUpperBound)
+            if (controlConfig.getDeadZoneLowerBound() <= polledValue
+                    && polledValue <= controlConfig.getDeadZoneUpperBound())
             {
                 // Value is in the dead zone.  Set to zero.
                 polledValue = 0f;
@@ -472,7 +475,7 @@ final class ControllerPoller
         }
 
         // STEP 3: Inversion
-        if (controlConfig.isInverted)
+        if (controlConfig.isInverted())
         {
             if (controlType == NiceControlType.DISCRETE_INPUT)
             {
@@ -491,20 +494,20 @@ final class ControllerPoller
         }
 
         // STEP 4: Recentering
-        if (!Float.isNaN(controlConfig.centerValueOverride)
-                && controlConfig.centerValueOverride != 0f)
+        if (!Float.isNaN(controlConfig.getCenterValueOverride())
+                && controlConfig.getCenterValueOverride() != 0f)
         {
             float positiveExpansion;
             float negativeExpansion;
-            if (controlConfig.centerValueOverride > 0f)
+            if (controlConfig.getCenterValueOverride() > 0f)
             {
-                positiveExpansion = 1f - controlConfig.centerValueOverride;
-                negativeExpansion = 1f + controlConfig.centerValueOverride;
+                positiveExpansion = 1f - controlConfig.getCenterValueOverride();
+                negativeExpansion = 1f + controlConfig.getCenterValueOverride();
             }
             else
             {
-                negativeExpansion = 1f - Math.abs(controlConfig.centerValueOverride);
-                positiveExpansion = 1f - controlConfig.centerValueOverride;
+                negativeExpansion = 1f - Math.abs(controlConfig.getCenterValueOverride());
+                positiveExpansion = 1f - controlConfig.getCenterValueOverride();
             }
 
             if (polledValue > 0)
@@ -517,7 +520,7 @@ final class ControllerPoller
             }
             else
             {
-                polledValue = controlConfig.centerValueOverride;
+                polledValue = controlConfig.getCenterValueOverride();
             }
         }
 
@@ -626,7 +629,7 @@ final class ControllerPoller
      * 
      * @param listener the listener to add.
      */
-    final void addControlPollingListener(
+    public final void addControlPollingListener(
             ControlPollingListener listener)
     {
         controlPollingListeners.add(listener);
@@ -637,7 +640,7 @@ final class ControllerPoller
      * 
      * @param listener the listener to be removed
      */
-    final void removeControlPollingListener(
+    public final void removeControlPollingListener(
             ControlPollingListener listener)
     {
         controlPollingListeners.remove(listener);
