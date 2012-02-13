@@ -101,6 +101,7 @@ public class ControllerConfigurator
         if (defaultConfiguration != null) {
             configBuilder.loadFrom(defaultConfiguration);
         }
+        this.controller.setConfiguration(defaultConfiguration);
         eligibleControls = new HashSet<NiceControl>(controller.getControls());
     }
 
@@ -227,10 +228,8 @@ public class ControllerConfigurator
             ControllerPoller poller = ControllerPoller.getInstance(controller);
             identificationThread = Thread.currentThread();
 
-            CountDownLatch latch = new CountDownLatch(1);
-            IdentificationListener myListener =
-                new IdentificationListener(
-                        latch, allowedTypes, ineligibleControls);
+            final CountDownLatch latch = new CountDownLatch(1);
+            final IdentificationListener myListener = new IdentificationListener(latch, allowedTypes, ineligibleControls);
             poller.addControlPollingListener(myListener);
 
             boolean success = false;
@@ -301,18 +300,14 @@ public class ControllerConfigurator
 
             // Stop calibration.
             calibrationHelper.stop();
-            ControllerPoller.getInstance(controller)
-                .removeControlPollingListener(calibrationHelper);
+            ControllerPoller.getInstance(controller).removeControlPollingListener(calibrationHelper);
             calibrating = false;
 
             ControllerManager.getEventDispatcher().submit(new LoggingRunnable(){
                 @Override
-                protected void runInternal()
-                {
-                    for (CalibrationListener listener : calibrationListeners)
-                    {
-                        listener.calibrationStopped(
-                                controller, calibrationHelper.builder.build());
+                protected void runInternal() {
+                    for (CalibrationListener listener : calibrationListeners) {
+                        listener.calibrationStopped(controller, calibrationHelper.builder.build());
                     }
                 }
             });
@@ -320,6 +315,30 @@ public class ControllerConfigurator
             return calibrationHelper.builder.build();
         }
     }
+    
+    /**
+     * Returns true if and only if the specified value lies within the
+     * specified dead zone.
+     * 
+     * @param value the value to check
+     * @param deadZoneLowerBound the lower bound of the dead zone, or NaN
+     * @param deadZoneUpperBound the upper bound of the dead zone, or NaN
+     * @return as described
+     */
+    private final static boolean inDeadZone(final float value, final float deadZoneLowerBound, final float deadZoneUpperBound) {
+        if (!Float.isNaN(deadZoneLowerBound)) {
+            if (value <= 0 && value >= deadZoneLowerBound) {
+                return true;
+            }
+        }
+        if (!Float.isNaN(deadZoneUpperBound)) {
+            if (value >= 0 && value <= deadZoneUpperBound) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Listens for polling events and identifies the first control to
      * reach the end of its range and return to neutral.
@@ -374,16 +393,16 @@ public class ControllerConfigurator
          * that are ineligible for identification; if <code>null</code>,
          * any control may be identified so long as its type is allowed
          */
-        IdentificationListener(CountDownLatch latch,
-                Set<NiceControlType> allowedTypes,
-                Set<NiceControl> ineligibleControls) {
+        IdentificationListener(final CountDownLatch latch,
+                final Set<NiceControlType> allowedTypes,
+                final Set<NiceControl> ineligibleControls) {
             this.latch = latch;
             this.allowedTypes = allowedTypes;
             this.ineligibleControls = ineligibleControls;
         }
 
         @Override
-        public final void controlPolled(ControlEvent event) {
+        public final void controlPolled(final ControlEvent event) {
             //System.out.println(event);
             if (event.sourceControl == null || winner != null
                     || !eligibleControls.contains(event.sourceControl)) {
@@ -429,9 +448,25 @@ public class ControllerConfigurator
             } else if (event.sourceControl.getControlType() == NiceControlType.CONTINUOUS_INPUT) {
                 // Continuous controls can theoretically take on any value
                 // in the allowed range.  These are usually analog in nature.
+                // We obey any dead zone settings here so that we don't "identify"
+                // a control that is just jittery near its center (as many
+                // analog controls are due to their high precision)
+                final ControlConfiguration config = event.sourceController.getConfiguration().getConfiguration(event.sourceControl);
+                final float deadZoneLowerBound = config.getDeadZoneLowerBound();
+                final float deadZoneUpperBound = config.getDeadZoneUpperBound();
+                final boolean inDeadZone = inDeadZone(event.currentValue, deadZoneLowerBound, deadZoneUpperBound);
+                if (inDeadZone) {
+                    return; // ignore control values in the dead zones
+                } else {
+                    System.out.println("Control is not in dead zone: " + event.sourceControl.getDeclaredName() + ": " + event.currentValue);
+                }
+
                 if (event.sourceControl.isRelative()) {
                     // Relative controls may never hit their range.
-                    // Any non-zero value will fulfill the bounds check.
+                    // Any non-zero value could potentially fulfill the
+                    // bounds check, but similar to the non-relative controls
+                    // we will guard against values near zero because these
+                    // are likely to be in the dead zone.
                     if (event.currentValue != 0.0f) {
                         boundsReachedByControl.put(event.sourceControl, Boolean.TRUE);
                         qualifyingValueByControl.put(event.sourceControl, event.currentValue);

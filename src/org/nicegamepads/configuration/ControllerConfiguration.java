@@ -42,7 +42,7 @@ public class ControllerConfiguration
      * 
      * @param controller the controller to create a compatible configuration for
      */
-    public ControllerConfiguration(ControllerConfigurationBuilder builder) {
+    public ControllerConfiguration(final ControllerConfigurationBuilder builder) {
         this.controller = builder.getController();
         final Map<NiceControl, ControlConfiguration> configurations = new LinkedHashMap<NiceControl, ControlConfiguration>();
         for (Map.Entry<NiceControl, ControlConfigurationBuilder> builderEntry : builder.getConfigurationBuilders().entrySet()) {

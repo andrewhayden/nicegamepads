@@ -495,7 +495,7 @@ public class ControlConfigurationBuilder {
         setDeadZoneLowerBound(ConfigurationUtils.getFloat(
                 source, prefix + ".deadZoneLowerBound"));
         setDeadZoneUpperBound(ConfigurationUtils.getFloat(
-                source, prefix + ".deadZoneLowerBound"));
+                source, prefix + ".deadZoneUpperBound"));
         setGranularity(ConfigurationUtils.getFloat(
                 source, prefix + ".granularity"));
         setInverted(ConfigurationUtils.getBoolean(
