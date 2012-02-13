@@ -325,29 +325,4 @@ public final class ConfigurationUtils
         rawBits |= lsb;
         return Float.intBitsToFloat(rawBits);
     }
-
-    /**
-     * Returns the fingerprint from the specified mappings as if part of a
-     * complete {@link #loadFromMap(String, Map)}, but does not
-     * load the value into this configuration.
-     * 
-     * @param prefix the prefix, as in {@link #loadFromMap(String, Map)}
-     * @param source the source to lookup the fingerprint in
-     * @return the fingerprint
-     * @throws ConfigurationException if the value isn't found in the
-     * specified source
-     */
-    public final static int readControllerFingerprintFromMap(String prefix, final Map<String,String> source)
-    throws ConfigurationException {
-        // Check prefix and amend as necessary
-        if (prefix != null && prefix.length() > 0) {
-            if (!prefix.endsWith(".")) {
-                prefix = prefix + ".";
-            }
-        } else {
-            prefix = "";
-        }
-        return ConfigurationUtils.getInteger(source, prefix + "controllerFingerprint");
-    }
-
 }
