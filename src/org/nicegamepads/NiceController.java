@@ -11,9 +11,12 @@ import java.util.Set;
 
 import net.java.games.input.Component;
 import net.java.games.input.Controller;
+import net.java.games.input.Controller.Type;
 import net.java.games.input.ControllerEnvironment;
 import net.java.games.input.Rumbler;
-import net.java.games.input.Controller.Type;
+
+import org.nicegamepads.configuration.ControllerConfiguration;
+import org.nicegamepads.configuration.ControllerConfigurationBuilder;
 
 public final class NiceController
 {
@@ -78,17 +81,8 @@ public final class NiceController
     /**
      * The configuration for this controller.
      */
-    private ControllerConfiguration config = null;
-
-    /**
-     * Modification counter for the configuration.
-     */
-    private int configModificationCounter = 0;
-
-    /**
-     * Cached copy of the controller configuration.
-     */
-    private ControllerConfiguration cachedConfig = null;
+    // TODO: Make NiceController immutable and use the builder pattern?
+    private volatile ControllerConfiguration config = null;
 
     /**
      * Mutex for polling.
@@ -106,10 +100,8 @@ public final class NiceController
     {
         synchronized(wrappersByJinputController)
         {
-            NiceController instance =
-                wrappersByJinputController.get(controller);
-            if (instance == null)
-            {
+            NiceController instance = wrappersByJinputController.get(controller);
+            if (instance == null) {
                 instance = new NiceController(controller);
                 instance.init();
                 wrappersByJinputController.put(controller, instance);
@@ -127,7 +119,7 @@ public final class NiceController
      * 
      * @param jinputController the controller to wrap
      */
-    private NiceController(Controller jinputController)
+    private NiceController(final Controller jinputController)
     {
         this.jinputController = jinputController;
     }
@@ -140,14 +132,10 @@ public final class NiceController
     {
         List<NiceControl> discoveredControls = new ArrayList<NiceControl>();
         getControlsHelper(this.jinputController, discoveredControls);
-        cachedControlsByController.put(this,
-                Collections.unmodifiableList(discoveredControls));
+        cachedControlsByController.put(this, Collections.unmodifiableList(discoveredControls));
         fingerprint = generateFingerprint();
         gamepadLike = isGamepadLikeInternal();
-        config = new ControllerConfiguration(this);
-        loadDeadZoneDefaults();
-        cachedConfig = new ControllerConfiguration(config);
-        configModificationCounter = config.getModificationCount();
+        config = new ControllerConfigurationBuilder(this).build();
     }
 
     public final int getFingerprint()
@@ -510,190 +498,25 @@ public final class NiceController
     }
 
     /**
-     * Returns an independent, mutable copy of the configuration for this
-     * controller.
-     * <p>
-     * The returned copy is completely independent of the original.  It can
-     * be modified, but modifications will not affect this controller.
-     * <p>
-     * This method should <strong>only</strong> be used to obtain a
-     * <strong>mutable copy</strong> of the configuration.  If you do
-     * <em>not</em> need a mutable copy, you should call
-     * {@link #getConfigurationCached()} instead, which
-     * efficiently caches the configuration until it is changed and
-     * can be called as often as necessary with little overhead.
+     * Returns the current immutable configuration for this controller.
      * 
-     * @return an independent and mutable copy of the configuration for
-     * the controller
-     * @see #getConfigurationLive()
-     * @see #getConfigurationCached()
+     * @return the current configuration for the controller
      */
-    public final ControllerConfiguration getConfigurationCopy()
-    {
-        return new ControllerConfiguration(config);
+    public final ControllerConfiguration getConfiguration() {
+        return config;
     }
 
     /**
-     * Returns the live copy of the configuration for this controller,
-     * which can be used to make changes immediately.
-     * <p>
-     * The returned configuration is live.  Changes made to this object
-     * take effect immediately and are visible to all threads.
+     * Sets the configuration used for this controller.  This change takes
+     * effect immediately.
      * 
-     * @return the live copy of the configuration for the controller
-     * @see #getConfigurationCopy()
-     * @see #getConfigurationCached()
+     * @param config the configuration to set.
      */
-    public final ControllerConfiguration getConfigurationLive()
-    {
-        return new ControllerConfiguration(config);
+    public final void setConfiguration(final ControllerConfiguration config) {
+        this.config = config;
     }
 
-    /**
-     * Returns an independent, cached copy of the configuration for this
-     * controller.
-     * <p>
-     * The returned copy is completely independent of the original.  Although
-     * it can be modified, it is generally an error to do so as the copy is
-     * regenerated as often as necessary and thus all changes may be lost
-     * at any time.  Any such modifications will not affect this controller
-     * in any case.
-     * <p>
-     * This method is preferable to {@link #getConfigurationCopy()} as it
-     * does not create a new configuration object every time.  As long as
-     * you intend only to read the returned configuration, use this method.
-     * 
-     * @return an independent cached copy of the configuration for
-     * the controller
-     * @see #getConfigurationCopy()
-     * @see #getConfigurationLive()
-     */
-    public final ControllerConfiguration getConfigurationCached()
-    {
-        config.lockConfiguration();
-        if (configModificationCounter != config.getModificationCount())
-        {
-            cachedConfig = new ControllerConfiguration(config);
-            configModificationCounter = config.getModificationCount();
-        }
-        config.unlockConfiguration();
-        return cachedConfig;
-    }
 
-    /**
-     * Convenience method to set the specified dead zones for all of the
-     * controller's analog controls.
-     * <p>
-     * This is useful for hyper-sensitive controllers that don't report
-     * reasonable dead zones.  A small range such as
-     * <code>[-0.05f, 0.05f]</code> (that is, 5% of the total range)
-     * is usually a good choice, as it will generally compensate for random
-     * jitter without making the device feel unresponsive.  Different
-     * controllers may vary significantly in this regard, however, so some
-     * experimentation may be necessary.
-     * <p>
-     * Note that the bounds are constrained by the requirements set forth
-     * in {@link ControlConfiguration#setDeadZoneBounds(float, float)}.
-     * <p>
-     * This method is equivalent to finding all analog controls in
-     * a controller and invoking
-     * {@link ControlConfiguration#setDeadZoneBounds(float, float)}
-     * for each such control.
-     * 
-     * @param lowerBound see
-     * {@link ControlConfiguration#setDeadZoneBounds(float, float)
-     * @param upperBound see
-     * {@link ControlConfiguration#setDeadZoneBounds(float, float)
-     */
-    public final void setAllAnalogDeadZones(float lowerBound, float upperBound)
-    {
-        List<NiceControl> eligibleControls =
-            getControlsByType(NiceControlType.CONTINUOUS_INPUT);
-        config.lockConfiguration();
-        for (NiceControl control : eligibleControls)
-        {
-            config.getConfiguration(control).setDeadZoneBounds(
-                        lowerBound, upperBound);
-        }
-        config.unlockConfiguration();
-    }
-
-    /**
-     * Convenience method to set the specified granularity for all of the
-     * controller's analog controls.
-     * <p>
-     * This is useful for sensitive controllers that provide more values
-     * than your application can reasonably make use of, and as a result
-     * flood the system with value-changed events that are of little or
-     * no real consequence (e.g., value change from 0.0001 to 0.0002).
-     * Generally, even a small granularity such as 0.2 will greatly
-     * reduce the number of spurious value-changed events encountered.  For
-     * example, a granularity of 0.2 splits the logical range of an analog
-     * control into 10 logical "buckets", 5 on each side of 0 (e.g.,
-     * left and right each have 5 "buckets").
-     * <p>
-     * Different controllers may vary significantly in this regard, so some
-     * experimentation may be necessary.
-     * <p>
-     * Note that the values are constrained by the requirements set forth
-     * in {@link ControlConfiguration#setGranularity(float)}.
-     * <p>
-     * This method is equivalent to finding all analog controls in
-     * a controller and invoking
-     * {@link ControlConfiguration#setGranularity(float)}
-     * for each such control.
-     * 
-     * @param granularity see
-     * {@link ControlConfiguration#setGranularity(float)}
-     */
-    public final void setAllAnalogGranularities(float granularity)
-    {
-        List<NiceControl> eligibleControls =
-            getControlsByType(NiceControlType.CONTINUOUS_INPUT);
-        config.lockConfiguration();
-        for (NiceControl control : eligibleControls)
-        {
-            config.getConfiguration(control).setGranularity(granularity);
-        }
-        config.unlockConfiguration();
-    }
-
-    /**
-     * Convenience method to (re)load the default dead zones for all of the
-     * controller's controls.
-     */
-    public final void loadDeadZoneDefaults()
-    {
-        config.lockConfiguration();
-        for (NiceControl control : getControls())
-        {
-            control.loadDeadZoneDefaults();
-        }
-        config.unlockConfiguration();
-    }
-
-    /**
-     * Applies the specified configuration to this controller immediately.
-     * <p>
-     * The specified configuration must be from a controller whose
-     * fingerprint mathches that of this controller; that is, you may only
-     * apply configurations between controllers if the controllers are of
-     * the same <em>exact</em> physical type.  For example, you may apply the
-     * configuration of one XBox 360 USB controller to another provided that
-     * they have the same hardware revision.
-     * <p>
-     * This method updates the live configuration.  All changes are applied
-     * immediately and are visible to all threads.
-     * 
-     * @param newConfig the configuration to apply
-     * @throws ConfigurationException if the specified other configuration
-     * comes from a controller whose fingerprint does not match that of this
-     * controller
-     */
-    public final void applyConfiguration(ControllerConfiguration newConfig)
-    {
-        config.loadFrom(newConfig);
-    }
 
     /**
      * Polls all controls for the latest information immediately, and places

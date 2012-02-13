@@ -116,36 +116,6 @@ public class NiceControl
     }
 
     /**
-     * Load the default dead zones for the control into the live configuration.
-     * <p>
-     * This method takes effect immediately.
-     */
-    public final void loadDeadZoneDefaults()
-    {
-        ControllerConfiguration ownerConfig = controller.getConfigurationLive();
-        ownerConfig.lockConfiguration();
-        ControlConfiguration config = ownerConfig.getConfiguration(this);
-        float defaultDeadZone = jinputComponent.getDeadZone();
-        if (!Float.isNaN(defaultDeadZone)
-                && !Float.isInfinite(defaultDeadZone))
-        {
-            // Valid float found.
-            // We only care about the absolute value; kill negatives.
-            defaultDeadZone = Math.abs(defaultDeadZone);
-            // Sanity check, clamp to range [0,1]
-            defaultDeadZone = Math.min(defaultDeadZone, 1.0f);
-            // Configure
-            config.setDeadZoneBounds(
-                -1f * defaultDeadZone, defaultDeadZone);
-        }
-        else
-        {
-            config.setDeadZoneBounds(Float.NaN, Float.NaN);
-        }
-        ownerConfig.unlockConfiguration();
-    }
-
-    /**
      * Returns the type of this control.
      * 
      * @return the type of this control.
@@ -163,6 +133,20 @@ public class NiceControl
     public final NiceController getController()
     {
         return controller;
+    }
+
+    /**
+     * Don't use this method.
+     * 
+     * Returns the JInput-based component that backs this object.
+     * @return the component
+     * 
+     * @deprecated this method should not be publicly exposed and will be
+     * removed in a future update; you should not depend upon it.
+     */
+    // FIXME: Get rid of this, it should be accessible but only at a deeper level
+    public Component getJinputComponent() {
+        return jinputComponent;
     }
 
     /**
@@ -186,7 +170,7 @@ public class NiceControl
      * 
      * @return <code>true</code>
      */
-    final boolean isRelative()
+    public final boolean isRelative()
     {
         return isRelative;
     }

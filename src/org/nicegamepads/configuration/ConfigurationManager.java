@@ -1,4 +1,4 @@
-package org.nicegamepads;
+package org.nicegamepads.configuration;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -9,6 +9,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+
+import org.nicegamepads.NiceController;
 
 /**
  * Provides threadsafe access to configurations for all controllers.
@@ -413,9 +415,7 @@ public final class ConfigurationManager
         // Check type codes
         final int loadedFingerprint;
         try {
-            loadedFingerprint =
-                ControllerConfiguration.readControllerFingerprintFromMap(
-                        STANDARD_PREFIX, asMap);
+            loadedFingerprint = ConfigurationUtils.readControllerFingerprintFromMap(STANDARD_PREFIX, asMap);
         } catch(ConfigurationException e) {
             throw new ConfigurationException(
                     "Specified configuration file '" + sourceFile
@@ -434,8 +434,8 @@ public final class ConfigurationManager
         }
 
         // Got this far?  Everything looks good.  Go for it!
-        final ControllerConfiguration configuration = new ControllerConfiguration(controller);
-        configuration.loadFromMap(STANDARD_PREFIX, asMap);
-        return configuration;
+        final ControllerConfigurationBuilder builder = new ControllerConfigurationBuilder(controller);
+        builder.loadFromMap(STANDARD_PREFIX, asMap);
+        return builder.build();
     }
 }

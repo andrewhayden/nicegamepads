@@ -262,7 +262,7 @@ public final class ControllerManager
      * @throws IllegalStateException if the framework has not yet been
      * initialized via {@link #initialize()}
      */
-    final static ScheduledExecutorService getPollingService()
+    public final static ScheduledExecutorService getPollingService()
     {
         synchronized(staticLock)
         {
@@ -282,7 +282,7 @@ public final class ControllerManager
      * @throws IllegalStateException if the framework has not yet been
      * initialized via {@link #initialize()}
      */
-    final static ExecutorService getEventDispatcher()
+    public final static ExecutorService getEventDispatcher()
     {
         synchronized(staticLock)
         {

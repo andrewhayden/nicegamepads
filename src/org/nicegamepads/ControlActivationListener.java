@@ -1,5 +1,7 @@
 package org.nicegamepads;
 
+import org.nicegamepads.configuration.ControlConfiguration;
+
 /**
  * Interface for entities wishing to be notified when a control is
  * activated or deactivated.

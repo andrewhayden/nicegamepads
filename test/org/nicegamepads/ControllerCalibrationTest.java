@@ -2,6 +2,10 @@ package org.nicegamepads;
 
 import java.util.List;
 
+import org.nicegamepads.configuration.ControllerConfiguration;
+import org.nicegamepads.configuration.ControllerConfigurationBuilder;
+import org.nicegamepads.configuration.ControllerConfigurator;
+
 
 public class ControllerCalibrationTest
 {
@@ -15,11 +19,9 @@ public class ControllerCalibrationTest
         }
 
         NiceController controller = gamepads.get(0);
-        ControllerConfiguration config = new ControllerConfiguration(controller);
-        controller.loadDeadZoneDefaults();
+        ControllerConfiguration config = new ControllerConfigurationBuilder(controller).build();
         System.out.println(config);
-        ControllerConfigurator configurator =
-            new ControllerConfigurator(controller, config);
+        ControllerConfigurator configurator = new ControllerConfigurator(controller, config);
 
         configurator.addCalibrationListener(new CalibrationListener(){
 
