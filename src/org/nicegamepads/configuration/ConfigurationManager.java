@@ -243,8 +243,7 @@ public final class ConfigurationManager
             parentDirectory.mkdirs();
         }
 
-        final Map<String,String> asMap = configuration.saveToMap(
-                STANDARD_PREFIX, null);
+        final Map<String,String> asMap = configuration.saveToMap(STANDARD_PREFIX, null);
         asMap.put(STANDARD_PREFIX + ".majorVersion", Integer.toString(MAJOR_VERSION));
         asMap.put(STANDARD_PREFIX + ".minorVersion", Integer.toString(MINOR_VERSION));
 
@@ -415,7 +414,7 @@ public final class ConfigurationManager
         // Check type codes
         final int loadedFingerprint;
         try {
-            loadedFingerprint = ConfigurationUtils.readControllerFingerprintFromMap(STANDARD_PREFIX, asMap);
+            loadedFingerprint = readControllerFingerprintFromMap(STANDARD_PREFIX, asMap);
         } catch(ConfigurationException e) {
             throw new ConfigurationException(
                     "Specified configuration file '" + sourceFile
@@ -437,5 +436,29 @@ public final class ConfigurationManager
         final ControllerConfigurationBuilder builder = new ControllerConfigurationBuilder(controller);
         builder.loadFromMap(STANDARD_PREFIX, asMap);
         return builder.build();
+    }
+
+    /**
+     * Returns the fingerprint from the specified mappings as if part of a
+     * complete {@link #loadFromMap(String, Map)}, but does not
+     * load the value into this configuration.
+     * 
+     * @param prefix the prefix, as in {@link #loadFromMap(String, Map)}
+     * @param source the source to lookup the fingerprint in
+     * @return the fingerprint
+     * @throws ConfigurationException if the value isn't found in the
+     * specified source
+     */
+    private final static int readControllerFingerprintFromMap(String prefix, final Map<String,String> source)
+    throws ConfigurationException {
+        // Check prefix and amend as necessary
+        if (prefix != null && prefix.length() > 0) {
+            if (!prefix.endsWith(".")) {
+                prefix = prefix + ".";
+            }
+        } else {
+            prefix = "";
+        }
+        return ConfigurationUtils.getInteger(source, prefix + "controllerFingerprint");
     }
 }

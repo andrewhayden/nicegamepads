@@ -109,12 +109,12 @@ public class ControllerConfiguration
         }
 
         destination.put(prefix + "numControls", Integer.toString(controlConfigurations.size()));
+        destination.put(prefix + "controllerFingerprint", Integer.toString(controller.getFingerprint()));
 
         // Write out all controls.
         int counter = 0;
         for (ControlConfiguration config : controlConfigurations.values()) {
-            config.saveToProperties(
-                    prefix + "control" + counter, destination);
+            config.saveToProperties(prefix + "control" + counter, destination);
             counter++;
         }
 
